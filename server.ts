@@ -67,19 +67,33 @@ async function startServer() {
       if (supabase) {
         try {
           // Get user ID by email to log correctly
-          const { data: userData } = await supabase.from('profiles').select('id, data').ilike('data->>email', email).single();
+          // We use maybeSingle() to avoid throwing if not found
+          const { data: userData, error: userError } = await supabase
+            .from('profiles')
+            .select('id, data')
+            .filter('data->>email', 'eq', email)
+            .maybeSingle();
           
-          await supabase.from('milestones').insert({
+          if (userError) {
+            console.warn("Supabase profile lookup error:", userError.message);
+          }
+
+          const { error: insertError } = await supabase.from('milestones').insert({
             user_id: userData?.id || null,
             email,
             streak,
             metadata: { name, timestamp: new Date().toISOString() }
           });
+
+          if (insertError) {
+            console.warn("Supabase milestone insert error (table might not exist yet):", insertError.message);
+          } else {
+            console.log("Milestone logged to Supabase successfully.");
+          }
           
           // If user has a custom webhook in their data, use it
           if (userData?.data?.webhook_url) {
-            console.log("Using user-specific webhook URL from Supabase");
-            // We'll handle this in the automation section below
+            console.log("User has a custom webhook URL in their profile.");
           }
         } catch (dbErr) {
           console.error("Failed to log milestone to Supabase:", dbErr);
@@ -155,11 +169,19 @@ async function startServer() {
       // Check if we have a user-specific webhook from Supabase
       if (supabase) {
         try {
-          const { data: userData } = await supabase.from('profiles').select('data').ilike('data->>email', email).single();
+          const { data: userData } = await supabase
+            .from('profiles')
+            .select('data')
+            .filter('data->>email', 'eq', email)
+            .maybeSingle();
+            
           if (userData?.data?.webhook_url) {
             automationUrl = userData.data.webhook_url;
+            console.log("Using user-specific webhook URL from Supabase profile.");
           }
-        } catch (e) {}
+        } catch (e) {
+          console.warn("Failed to fetch user-specific webhook:", e);
+        }
       }
 
       if (automationUrl) {
