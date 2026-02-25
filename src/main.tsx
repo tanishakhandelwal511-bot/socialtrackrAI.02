@@ -1109,12 +1109,15 @@ function init() {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   
-  if (!supabaseUrl || !supabaseKey) {
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
     const authErr = document.getElementById('authErr')!;
+    const isRender = window.location.hostname.includes('render.com');
     authErr.innerHTML = `
       <div style="background:var(--el); color:var(--err); padding:12px; border-radius:8px; font-size:13px; margin-bottom:16px; border:1px solid var(--err);">
         <strong>⚠️ Supabase Not Configured</strong><br>
-        Please add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to your Secrets.
+        ${isRender 
+          ? 'On Render: Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to your <strong>Environment Variables</strong> and <strong>Clear Cache & Redeploy</strong>.' 
+          : 'Please add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to your Secrets.'}
       </div>
     `;
     authErr.classList.add('show');
