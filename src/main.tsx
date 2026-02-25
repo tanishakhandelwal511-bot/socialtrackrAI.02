@@ -1127,6 +1127,33 @@ function init() {
     authErr.classList.add('show');
   }
 
+  // Safety timeout: Remove loader after 5 seconds regardless of auth status
+  setTimeout(() => {
+    const loader = document.getElementById('app-loading');
+    const status = document.getElementById('loading-status');
+    const retryBtn = document.getElementById('loading-retry');
+    
+    if (loader && status) {
+      console.warn('Auth taking longer than expected...');
+      status.textContent = 'Connection taking longer than expected...';
+      if (retryBtn) {
+        retryBtn.style.display = 'inline-block';
+        retryBtn.onclick = () => window.location.reload();
+      }
+      
+      // After 10 seconds, force remove the loader if still there
+      setTimeout(() => {
+        const stillThere = document.getElementById('app-loading');
+        if (stillThere) {
+          console.error('Auth timed out completely. Forcing app start.');
+          stillThere.style.opacity = '0';
+          setTimeout(() => stillThere.remove(), 300);
+          if (!DB.user) showPage('login');
+        }
+      }, 5000);
+    }
+  }, 5000);
+
   // Supabase Auth Listener
   try {
     supabase.auth.onAuthStateChange(async (event, session) => {
