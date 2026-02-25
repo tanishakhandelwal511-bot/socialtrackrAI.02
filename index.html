@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SocialTrackr – AI Growth OS</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app-loading" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#F7F8FC;display:flex;align-items:center;justify-content:center;z-index:9999;font-family:sans-serif;color:#6C5CE7;font-weight:bold;transition:opacity 0.3s ease;">
+      <div style="text-align:center;">
+        <div style="font-size:24px;margin-bottom:10px;">📅 SocialTrackr</div>
+        <div style="font-size:14px;opacity:0.6;">Initializing AI Growth OS...</div>
+      </div>
+    </div>
+    <div id="root"></div>
+
+    <div class="toast" id="toast"></div>
+    <div class="conf-wrap" id="confWrap"></div>
+
+    <!-- CUSTOM MODAL -->
+    <div class="modal-ov" id="modalOv">
+      <div class="modal-box" id="modalBox">
+        <div class="modal-icon" id="modalIcon"></div>
+        <div class="modal-title" id="modalTitle"></div>
+        <div class="modal-desc" id="modalDesc"></div>
+        <input class="modal-input hidden" id="modalInput" type="text" placeholder="">
+        <div class="modal-actions">
+          <button class="modal-cancel" id="modalCancel">Cancel</button>
+          <button class="modal-confirm" id="modalConfirm">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ LOGIN ═══════════ -->
+    <div class="pg" id="pg-login">
+      <div class="login-grid"></div>
+      <div class="login-orb"></div>
+      <div class="login-card">
+        <div class="badge">✦ AI Growth OS</div>
+        <h1 class="login-h">Build Daily.<br><em>Grow Relentlessly.</em></h1>
+        <p class="login-sub">Growth isn't luck. It's systems.</p>
+        <div class="auth-err" id="authErr"></div>
+        <button class="g-btn" id="googleAuthBtn">
+          <svg width="17" height="17" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Continue with Google
+        </button>
+        <div class="div"><span>or</span></div>
+        <div class="fg" id="nameGrp" style="display:none">
+          <label class="fl">Full Name <span style="color:var(--err)">*</span></label>
+          <input class="fi" id="nameIn" type="text" placeholder="Your full name" autocomplete="name">
+          <div class="ferr" id="nameErr">Please enter your full name.</div>
+        </div>
+        <div class="fg">
+          <label class="fl">Email address <span style="color:var(--err)">*</span></label>
+          <input class="fi" id="emailIn" type="email" placeholder="you@example.com" autocomplete="email">
+          <div class="ferr" id="emailErr">Enter a valid email address.</div>
+        </div>
+        <div class="fg">
+          <label class="fl">Password <span style="color:var(--err)">*</span></label>
+          <input class="fi" id="passIn" type="password" placeholder="Min. 6 characters">
+          <div class="ferr" id="passErr">Password must be at least 6 characters.</div>
+        </div>
+        <button class="btn" id="authBtn">Sign in</button>
+        <div class="toggle-row"><span id="toggleTxt">Don't have an account?</span> <a id="toggleAuthMode">Create one →</a></div>
+      </div>
+    </div>
+
+    <!-- ═══════════ ONBOARDING ═══════════ -->
+    <div class="pg" id="pg-ob">
+      <div class="ob-wrap">
+        <div class="ob-prog-bar"><div class="ob-prog-fill" id="obFill"></div></div>
+        <div class="ob-prog-lbl" id="obLbl"></div>
+        <div id="ob-s1">
+          <h2 class="ob-title">Which platform are you building on?</h2>
+          <p class="ob-sub">Your calendar and content will be fully tailored to this platform.</p>
+          <div class="og c3" id="pltGrid"></div>
+          <div class="ob-err" id="ob1err">Please select a platform.</div>
+        </div>
+        <div id="ob-s2" style="display:none">
+          <h2 class="ob-title">What's your niche?</h2>
+          <p class="ob-sub">All AI ideas will focus specifically on this topic.</p>
+          <div class="og c4" id="nicheGrid"></div>
+          <div class="custom-row" id="customRow">
+            <input class="fi" id="customIn" placeholder="Enter your exact niche (e.g. Minimalist Home Decor)..." style="margin-top:6px">
+            <div class="ferr" id="customErr">Please type your niche.</div>
+          </div>
+          <div class="ob-err" id="ob2err">Please select or enter a niche.</div>
+        </div>
+        <div id="ob-s3" style="display:none">
+          <h2 class="ob-title">What type of content do you create?</h2>
+          <p class="ob-sub" id="ob3sub">Select all that apply — your calendar will rotate between them.</p>
+          <div class="og c3" id="ctGrid"></div>
+          <div class="ob3-hint" id="ob3hint"></div>
+          <div class="ob-err" id="ob3err">Please select at least one content type.</div>
+        </div>
+        <div id="ob-s4" style="display:none">
+          <h2 class="ob-title">How often do you post?</h2>
+          <p class="ob-sub">This controls exactly how many posts appear in your calendar each month.</p>
+          <div class="og c2" style="max-width:460px">
+            <div class="oc" data-v="3" id="freq3"><div class="oc-icon">📅</div><div class="oc-label">3× per week</div><div class="oc-sub">~12 posts/month · Mon, Wed, Fri</div></div>
+            <div class="oc" data-v="5" id="freq5"><div class="oc-icon">🚀</div><div class="oc-label">5× per week</div><div class="oc-sub">~20 posts/month · Mon–Fri</div></div>
+            <div class="oc" data-v="7" id="freq7" style="grid-column:span 2"><div class="oc-icon">🔥</div><div class="oc-label">Daily</div><div class="oc-sub">30 posts/month · Every day</div></div>
+          </div>
+          <div class="ob-err" id="ob4err">Please select a posting frequency.</div>
+        </div>
+        <div class="ob-nav">
+          <button class="btn-ghost" id="obBackBtn" style="visibility:hidden">← Back</button>
+          <button class="btn-sm" id="obNextBtn">Continue →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ GENERATING ═══════════ -->
+    <div class="pg" id="pg-gen">
+      <div class="gen-card">
+        <div class="gen-icon">⚡</div>
+        <h2 class="gen-h">Building your calendar</h2>
+        <p class="gen-sub" id="genSub">Generating content tailored to your selections.</p>
+        <div>
+          <div class="gen-step"><div class="gen-dot">✓</div><span id="gs1">Analyzing platform + niche...</span></div>
+          <div class="gen-step"><div class="gen-dot">✓</div><span id="gs2">Creating content ideas...</span></div>
+          <div class="gen-step"><div class="gen-dot">✓</div><span id="gs3">Scheduling by frequency...</span></div>
+          <div class="gen-step"><div class="gen-dot">✓</div>Finalizing your calendar</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════
+      3-COLUMN APP SHELL — Dashboard
+    ════════════════════════════════════════════════ -->
+    <div class="pg" id="pg-dash">
+      <aside class="sb" id="sb-dash">
+        <div class="sb-header">
+          <div class="sb-logo-icon">📅</div>
+          <div class="sb-logo-text">Social<em>Trackr</em></div>
+        </div>
+        <div class="sb-user">
+          <div class="sb-user-av" id="sbAv1">?</div>
+          <div class="sb-user-info">
+            <div class="sb-user-name" id="sbName1">User</div>
+            <div class="sb-user-role">Content Creator</div>
+          </div>
+        </div>
+        <div class="sb-sec">Workspace</div>
+        <div class="sbi on" id="navDash">
+          <div class="sbi-ic">📅</div>Calendar
+        </div>
+        <div class="sbi" id="navAn">
+          <div class="sbi-ic">📊</div>Analytics
+        </div>
+        <div class="sbi" id="navAi">
+          <div class="sbi-ic">🤖</div>AI Assistant
+        </div>
+        <div class="sb-sec">Account</div>
+        <div class="sbi" id="navSignOut">
+          <div class="sbi-ic">🚪</div>Sign out
+        </div>
+        <div class="sbi" id="btnToggleDark">
+          <div class="sbi-ic" id="darkIcon">🌙</div><span id="darkTxt">Dark Mode</span>
+        </div>
+        <div class="sb-spacer"></div>
+        <div class="sb-footer" style="font-size:11px;color:var(--muted);padding:16px 20px;">
+          SocialTrackr · AI Growth OS
+        </div>
+      </aside>
+
+      <main class="app-main">
+        <div class="app-main-pad">
+          <div class="cal-header">
+            <div>
+              <div class="cal-title">Growth Dashboard</div>
+              <div class="cal-meta" id="calMeta"></div>
+            </div>
+            <div class="cal-controls">
+              <button class="cal-regen" id="btnRegen">↻ Regenerate Month</button>
+              <div class="cal-nav">
+                <button class="cal-arr" id="btnPrevMonth">‹</button>
+                <span class="cal-month" id="calMonthLbl"></span>
+                <button class="cal-arr" id="btnNextMonth">›</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="dash-summary" id="dashSummary">
+            <div class="ds-card">
+              <div class="ds-icon">🎯</div>
+              <div class="ds-info">
+                <div class="ds-val" id="dsGoal">Awareness</div>
+                <div class="ds-lbl">Current Phase</div>
+              </div>
+            </div>
+            <div class="ds-card">
+              <div class="ds-icon">📈</div>
+              <div class="ds-info">
+                <div class="ds-val" id="dsViews">0</div>
+                <div class="ds-lbl">Total Views</div>
+              </div>
+            </div>
+            <div class="ds-card">
+              <div class="ds-icon">🔥</div>
+              <div class="ds-info">
+                <div class="ds-val" id="dsStreak">0d</div>
+                <div class="ds-lbl">Active Streak</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="cal-box">
+            <div class="cal-days-head">
+              <div class="cal-dh">Sun</div><div class="cal-dh">Mon</div><div class="cal-dh">Tue</div>
+              <div class="cal-dh">Wed</div><div class="cal-dh">Thu</div><div class="cal-dh">Fri</div><div class="cal-dh">Sat</div>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+          </div>
+        </div>
+      </main>
+
+      <aside class="right-panel">
+        <div class="rp-block">
+          <div class="rp-block-title">Current Streak</div>
+          <div class="rp-streak-card">
+            <div class="rp-streak-top">
+              <div class="rp-streak-lbl">🔥 Streak</div>
+              <div class="rp-streak-badge" id="streakStatus">🔥 On fire!</div>
+            </div>
+            <div class="rp-streak-num"><span id="streakVal">0</span> Days</div>
+            <div class="rp-streak-next" id="streakNext">Next milestone: 7 days 🏆</div>
+            <div class="rp-streak-track">
+              <div class="rp-streak-fill" id="streakBar" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="rp-block">
+          <div class="rp-block-title">This Month</div>
+          <div class="rp-stats-grid">
+            <div class="rp-stat-card">
+              <div class="rp-stat-val" style="color:var(--accent)" id="qPlanned">0</div>
+              <div class="rp-stat-lbl">Planned</div>
+            </div>
+            <div class="rp-stat-card">
+              <div class="rp-stat-val" style="color:var(--green)" id="qDone">0</div>
+              <div class="rp-stat-lbl">Done</div>
+            </div>
+            <div class="rp-stat-card">
+              <div class="rp-stat-val" id="qPct">0%</div>
+              <div class="rp-stat-lbl">Completion</div>
+            </div>
+            <div class="rp-stat-card">
+              <div class="rp-stat-val" style="color:var(--blue)" id="qBest">0</div>
+              <div class="rp-stat-lbl">Best Streak</div>
+            </div>
+          </div>
+        </div>
+        <div class="rp-block" style="flex:1;overflow-y:auto;">
+          <div class="rp-block-title">Upcoming Posts</div>
+          <div id="ucList"></div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- ════════════════════════════════════════════════
+      3-COLUMN APP SHELL — Analytics
+    ════════════════════════════════════════════════ -->
+    <div class="pg" id="pg-an">
+      <aside class="sb" id="sb-an">
+        <div class="sb-header">
+          <div class="sb-logo-icon">📅</div>
+          <div class="sb-logo-text">Social<em>Trackr</em></div>
+        </div>
+        <div class="sb-user">
+          <div class="sb-user-av" id="sbAv2">?</div>
+          <div class="sb-user-info">
+            <div class="sb-user-name" id="sbName2">User</div>
+            <div class="sb-user-role">Content Creator</div>
+          </div>
+        </div>
+        <div class="sb-sec">Workspace</div>
+        <div class="sbi" id="navDash2"><div class="sbi-ic">📅</div>Calendar</div>
+        <div class="sbi on" id="navAn2"><div class="sbi-ic">📊</div>Analytics</div>
+        <div class="sbi" id="navAi2"><div class="sbi-ic">🤖</div>AI Assistant</div>
+        <div class="sb-sec">Account</div>
+        <div class="sbi" id="navSignOut2"><div class="sbi-ic">🚪</div>Sign out</div>
+        <div class="sbi" id="btnToggleDark2">
+          <div class="sbi-ic" id="darkIcon2">🌙</div><span id="darkTxt2">Dark Mode</span>
+        </div>
+        <div class="sb-spacer"></div>
+        <div class="sb-footer" style="font-size:11px;color:var(--muted);padding:16px 20px;">SocialTrackr · AI Growth OS</div>
+      </aside>
+      <main class="app-main">
+        <div class="app-main-pad" id="anMain"></div>
+      </main>
+    </div>
+
+    <!-- ════════════════════════════════════════════════
+      3-COLUMN APP SHELL — AI Assistant
+    ════════════════════════════════════════════════ -->
+    <div class="pg" id="pg-ai">
+      <aside class="sb" id="sb-ai">
+        <div class="sb-header">
+          <div class="sb-logo-icon">📅</div>
+          <div class="sb-logo-text">Social<em>Trackr</em></div>
+        </div>
+        <div class="sb-user">
+          <div class="sb-user-av" id="sbAv3">?</div>
+          <div class="sb-user-info">
+            <div class="sb-user-name" id="sbName3">User</div>
+            <div class="sb-user-role">Content Creator</div>
+          </div>
+        </div>
+        <div class="sb-sec">Workspace</div>
+        <div class="sbi" id="navDash3"><div class="sbi-ic">📅</div>Calendar</div>
+        <div class="sbi" id="navAn3"><div class="sbi-ic">📊</div>Analytics</div>
+        <div class="sbi on" id="navAi3"><div class="sbi-ic">🤖</div>AI Assistant</div>
+        <div class="sb-sec">Account</div>
+        <div class="sbi" id="navSignOut3"><div class="sbi-ic">🚪</div>Sign out</div>
+        <div class="sbi" id="btnToggleDark3">
+          <div class="sbi-ic" id="darkIcon3">🌙</div><span id="darkTxt3">Dark Mode</span>
+        </div>
+        <div class="sb-spacer"></div>
+        <div class="sb-footer" style="font-size:11px;color:var(--muted);padding:16px 20px;">SocialTrackr · AI Growth OS</div>
+      </aside>
+      <main class="app-main" style="display:flex;flex-direction:column;">
+        <div class="ai-shell">
+          <div class="ai-body">
+            <div class="ai-msgs" id="aiMsgs"></div>
+            <div class="ai-bottom">
+              <div class="ai-chips" id="aiChips"></div>
+              <div class="ai-bar">
+                <input class="ai-in" id="aiIn" placeholder="Ask me to improve your content strategy...">
+                <button class="ai-send" id="btnSendAI">Send →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- SIDE PANEL -->
+    <div class="sp-ov" id="spOv"></div>
+    <div class="sp" id="sp">
+      <div class="sp-head">
+        <div style="flex:1;min-width:0;padding-right:10px">
+          <div class="sp-meta" id="spMeta"></div>
+          <div class="sp-title" id="spTitle"></div>
+        </div>
+        <button class="sp-x" id="btnCloseSP">✕</button>
+      </div>
+      <div class="sp-body">
+        <div id="spFutureWarn" class="sp-future-warn hidden">⚠️ You can only mark today's or past posts as complete.</div>
+        <div><div class="sp-lbl">Hook</div><div class="sp-val" id="spHook"></div></div>
+        <div><div class="sp-lbl">Caption Starter (editable)</div><textarea class="sp-ta" id="spCap" rows="5"></textarea></div>
+        <div><div class="sp-lbl">Call to Action</div><div class="sp-val" id="spCTA"></div></div>
+        <div><div class="sp-lbl">Hashtags</div><div class="sp-tags" id="spTags"></div></div>
+        <div><div class="sp-lbl">Notes</div><textarea class="sp-ta" id="spNotes" placeholder="Personal notes, ideas, reminders..." rows="3"></textarea></div>
+      </div>
+      <div class="sp-foot">
+        <button class="sp-btn mark" id="spMarkBtn">🔥 Mark Done</button>
+        <button class="sp-btn metrics hidden" id="btnLogMetrics">📊 Log Metrics</button>
+        <button class="sp-btn ai" id="btnAiHelp">✨ AI Help</button>
+        <button class="sp-btn save" id="btnSaveSP">Save</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
