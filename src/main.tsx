@@ -1124,25 +1124,37 @@ function init() {
   }
 
   // Supabase Auth Listener
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('Auth event:', event);
-    if (session?.user) {
-      await doLogin(session.user);
-    } else {
-      DB.session = null;
-      DB.user = null;
-      dbSave();
-      resetU();
-      showPage('login');
-    }
-    
-    // Hide loading after initial auth check
+  try {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth event:', event);
+      try {
+        if (session?.user) {
+          await doLogin(session.user);
+        } else {
+          DB.session = null;
+          DB.user = null;
+          dbSave();
+          resetU();
+          showPage('login');
+        }
+      } catch (err) {
+        console.error('Error during auth state change:', err);
+        showPage('login');
+      } finally {
+        // Hide loading after initial auth check
+        const loader = document.getElementById('app-loading');
+        if (loader) {
+          loader.style.opacity = '0';
+          setTimeout(() => loader.remove(), 300);
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Supabase auth listener failed:', err);
     const loader = document.getElementById('app-loading');
-    if (loader) {
-      loader.style.opacity = '0';
-      setTimeout(() => loader.remove(), 300);
-    }
-  });
+    if (loader) loader.remove();
+    showPage('login');
+  }
 
   // Event Listeners
   document.getElementById('authBtn')?.addEventListener('click', handleAuth);
