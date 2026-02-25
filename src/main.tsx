@@ -77,6 +77,24 @@ function dbSave() {
 async function uLoad() {
   if (!DB.user) return;
   
+  // Skip Supabase for demo user
+  if (DB.user.id === 'demo-user') {
+    const raw = localStorage.getItem('st_u_demo-user');
+    if (raw) {
+      const d = JSON.parse(raw);
+      U.ob = d.ob || { plt: null, niche: null, cts: [], freq: null };
+      U.cal = d.cal || {};
+      U.done = d.done || {};
+      U.edits = d.edits || {};
+      U.metrics = d.metrics || [];
+      U.obStep = d.obStep || 1;
+      U.webhook_url = d.webhook_url || '';
+      U.dark = d.dark !== undefined ? d.dark : (localStorage.getItem('st_dark') === 'true');
+      applyDark();
+    }
+    return;
+  }
+  
   // Create a timeout promise
   const timeoutPromise = new Promise((_, reject) => 
     setTimeout(() => reject(new Error('Data load timeout')), 5000)
@@ -135,6 +153,9 @@ async function uSave() {
   // 1. Save locally for immediate persistence
   localStorage.setItem('st_u_' + DB.user.id, JSON.stringify(data));
   localStorage.setItem('st_dark', String(U.dark));
+
+  // Skip Supabase for demo user
+  if (DB.user.id === 'demo-user') return;
 
   // 2. Sync to Supabase (Upsert)
   try {
@@ -364,7 +385,23 @@ async function handleAuth() {
       if (error) throw error;
     }
   } catch (e: any) {
-    authErr.textContent = e.message || 'Authentication failed.';
+    console.error('Auth error:', e);
+    if (e.message === 'Failed to fetch' || e.name === 'TypeError') {
+      authErr.innerHTML = `
+        <div style="text-align:center">
+          <p><strong>Network Error:</strong> Could not reach Supabase.</p>
+          <p style="font-size:12px; opacity:0.8; margin-bottom:10px;">This usually means your internet is blocked or Supabase is down.</p>
+          <button id="btnDemoMode" style="background:var(--p); color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Try Demo Mode (Local Only)</button>
+        </div>
+      `;
+      document.getElementById('btnDemoMode')?.addEventListener('click', () => {
+        const demoUser = { id: 'demo-user', email: 'demo@example.com', user_metadata: { full_name: 'Demo User' } };
+        doLogin(demoUser);
+        showToast('Running in Demo Mode (Local Storage only) 🚀');
+      });
+    } else {
+      authErr.textContent = e.message || 'Authentication failed.';
+    }
     authErr.classList.add('show');
   } finally {
     authBtn.disabled = false;
@@ -383,7 +420,20 @@ async function handleGoogleAuth() {
     if (error) throw error;
   } catch (e: any) {
     const authErr = document.getElementById('authErr')!;
-    authErr.textContent = e.message || 'Google Auth failed.';
+    if (e.message === 'Failed to fetch' || e.name === 'TypeError') {
+      authErr.innerHTML = `
+        <div style="text-align:center">
+          <p><strong>Network Error:</strong> Could not reach Supabase.</p>
+          <button id="btnDemoModeGoogle" style="background:var(--p); color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Try Demo Mode (Local Only)</button>
+        </div>
+      `;
+      document.getElementById('btnDemoModeGoogle')?.addEventListener('click', () => {
+        const demoUser = { id: 'demo-user', email: 'demo@example.com', user_metadata: { full_name: 'Demo User' } };
+        doLogin(demoUser);
+      });
+    } else {
+      authErr.textContent = e.message || 'Google Auth failed.';
+    }
     authErr.classList.add('show');
   }
 }
@@ -1148,6 +1198,20 @@ function init() {
         retryBtn.style.display = 'inline-block';
         retryBtn.onclick = () => window.location.reload();
       }
+      
+      const demoBtn = document.createElement('button');
+      demoBtn.textContent = 'Try Demo Mode';
+      demoBtn.style.cssText = 'display:block;margin:10px auto;background:transparent;color:#6C5CE7;border:1px solid #6C5CE7;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;';
+      demoBtn.onclick = () => {
+        const demoUser = { id: 'demo-user', email: 'demo@example.com', user_metadata: { full_name: 'Demo User' } };
+        doLogin(demoUser);
+        const loader = document.getElementById('app-loading');
+        if (loader) {
+          loader.style.opacity = '0';
+          setTimeout(() => loader.remove(), 300);
+        }
+      };
+      retryBtn?.parentNode?.appendChild(demoBtn);
       
       // After 15 seconds, force remove the loader if still there
       setTimeout(() => {
