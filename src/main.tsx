@@ -389,9 +389,13 @@ async function handleAuth() {
     if (e.message === 'Failed to fetch' || e.name === 'TypeError') {
       authErr.innerHTML = `
         <div style="text-align:center">
-          <p><strong>Network Error:</strong> Could not reach Supabase.</p>
-          <p style="font-size:12px; opacity:0.8; margin-bottom:10px;">This usually means your internet is blocked or Supabase is down.</p>
-          <button id="btnDemoMode" style="background:var(--p); color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Try Demo Mode (Local Only)</button>
+          <p><strong>⚠️ Connection Blocked:</strong> Could not reach the database.</p>
+          <p style="font-size:12px; opacity:0.8; margin-bottom:10px;">
+            Your network is blocking the connection to Supabase. 
+            <strong>Real accounts cannot be created</strong> until this is fixed.
+          </p>
+          <button id="btnDemoMode" style="background:var(--p); color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">Use Demo Mode (Offline)</button>
+          <p style="font-size:11px; margin-top:10px; opacity:0.6;">Demo Mode saves data to your browser only.</p>
         </div>
       `;
       document.getElementById('btnDemoMode')?.addEventListener('click', () => {
@@ -423,8 +427,8 @@ async function handleGoogleAuth() {
     if (e.message === 'Failed to fetch' || e.name === 'TypeError') {
       authErr.innerHTML = `
         <div style="text-align:center">
-          <p><strong>Network Error:</strong> Could not reach Supabase.</p>
-          <button id="btnDemoModeGoogle" style="background:var(--p); color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Try Demo Mode (Local Only)</button>
+          <p><strong>⚠️ Connection Blocked:</strong> Could not reach Google/Supabase.</p>
+          <button id="btnDemoModeGoogle" style="background:var(--p); color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">Use Demo Mode (Offline)</button>
         </div>
       `;
       document.getElementById('btnDemoModeGoogle')?.addEventListener('click', () => {
@@ -850,7 +854,7 @@ function toggleDone() {
 }
 
 async function sendMilestoneEmail(streak: number) {
-  if (!DB.user) return;
+  if (!DB.user || DB.user.id === 'demo-user') return;
   const user = DB.user;
 
   try {
@@ -864,14 +868,15 @@ async function sendMilestoneEmail(streak: number) {
       })
     });
     
+    console.log(`Milestone API response: ${res.status} ${res.statusText}`);
+    
     let data;
     const contentType = res.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
       data = await res.json();
     } else {
       const text = await res.text();
-      console.error("Non-JSON response from server:", text);
-      // If it's a 404, the server might not be serving the API correctly
+      console.error(`Non-JSON response from ${res.url}:`, text.slice(0, 200));
       if (res.status === 404) {
         showToast(`⚠️ API Route not found (404). Check server logs.`);
       } else {

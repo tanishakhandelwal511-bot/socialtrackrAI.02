@@ -237,6 +237,11 @@ async function startServer() {
     }
   });
 
+  // Handle unknown API routes with JSON
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ success: false, error: `API route ${req.method} ${req.url} not found` });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
