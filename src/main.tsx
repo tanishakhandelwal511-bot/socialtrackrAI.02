@@ -38,6 +38,7 @@ interface AppState {
   openKey: string | null;
   aiInited: boolean;
   dark: boolean;
+  webhook_url?: string;
 }
 
 const U: AppState = {
@@ -54,6 +55,7 @@ const U: AppState = {
   openKey: null,
   aiInited: false,
   dark: localStorage.getItem('st_dark') === 'true',
+  webhook_url: '',
 };
 
 // ═══════════════════════════════════════════════════════
@@ -102,6 +104,7 @@ async function uLoad() {
     U.edits = d.edits || {};
     U.metrics = d.metrics || [];
     U.obStep = d.obStep || 1;
+    U.webhook_url = d.webhook_url || '';
     U.dark = d.dark !== undefined ? d.dark : (localStorage.getItem('st_dark') === 'true');
     const now = new Date();
     U.calY = now.getFullYear();
@@ -117,7 +120,8 @@ async function uSave() {
   const data = {
     ob: U.ob, cal: U.cal, done: U.done,
     edits: U.edits, metrics: U.metrics,
-    obStep: U.obStep, dark: U.dark
+    obStep: U.obStep, dark: U.dark,
+    webhook_url: U.webhook_url
   };
 
   // 1. Save locally for immediate persistence
@@ -1185,6 +1189,26 @@ function init() {
   document.getElementById('navAi2')?.addEventListener('click', () => goto('ai'));
   document.getElementById('navDash3')?.addEventListener('click', () => goto('dash'));
   document.getElementById('navAn3')?.addEventListener('click', () => goto('an'));
+  document.getElementById('navAi3')?.addEventListener('click', () => goto('ai'));
+
+  const openAutomationSettings = async () => {
+    const url = await openModal({
+      title: 'Automation Settings',
+      desc: 'Enter your Webhook URL (Make.com, Pipedream, or Discord) to trigger automations when you hit milestones.',
+      input: U.webhook_url || '',
+      confirmTxt: 'Save Settings',
+      icon: '⚙️'
+    });
+    if (url !== false) {
+      U.webhook_url = url as string;
+      uSave();
+      showToast('Automation settings saved! 🚀');
+    }
+  };
+
+  document.getElementById('btnSettings')?.addEventListener('click', openAutomationSettings);
+  document.getElementById('btnSettings2')?.addEventListener('click', openAutomationSettings);
+  document.getElementById('btnSettings3')?.addEventListener('click', openAutomationSettings);
   
   const signOut = async () => {
     await supabase.auth.signOut();

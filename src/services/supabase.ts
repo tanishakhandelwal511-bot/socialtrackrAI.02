@@ -17,8 +17,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    // Increase timeout to 30 seconds to prevent "LockManager" errors on slow networks
-    lockTimeout: 30000,
     // Use a custom storage key to avoid conflicts with other Supabase projects
     storageKey: 'socialtrackr-auth-token'
   }

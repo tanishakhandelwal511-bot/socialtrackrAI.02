@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import { Resend } from "resend";
+import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -10,6 +11,11 @@ const __dirname = path.dirname(__filename);
 
 console.log("Starting SocialTrackr Server...");
 dotenv.config();
+
+// Initialize Supabase
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 // Initialize Resend lazily
 let resendClient: Resend | null = null;
@@ -28,7 +34,7 @@ async function startServer() {
 
   // Health check for Render
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+    res.json({ status: "ok", timestamp: new Date().toISOString(), supabase: !!supabase });
   });
 
   app.get("/favicon.ico", (req, res) => {
@@ -56,6 +62,30 @@ async function startServer() {
 
     try {
       console.log(`Attempting to send email to ${email} for ${streak}-day streak...`);
+      
+      // 1. Log to Supabase if available
+      if (supabase) {
+        try {
+          // Get user ID by email to log correctly
+          const { data: userData } = await supabase.from('profiles').select('id, data').ilike('data->>email', email).single();
+          
+          await supabase.from('milestones').insert({
+            user_id: userData?.id || null,
+            email,
+            streak,
+            metadata: { name, timestamp: new Date().toISOString() }
+          });
+          
+          // If user has a custom webhook in their data, use it
+          if (userData?.data?.webhook_url) {
+            console.log("Using user-specific webhook URL from Supabase");
+            // We'll handle this in the automation section below
+          }
+        } catch (dbErr) {
+          console.error("Failed to log milestone to Supabase:", dbErr);
+        }
+      }
+
       const client = getResend();
       if (!client) {
         throw new Error("Email service not configured. Please set a valid RESEND_API_KEY.");
@@ -120,7 +150,18 @@ async function startServer() {
       console.log(`Email sent successfully to ${email}. Response data:`, data);
 
       // Free Automation Integration (Make.com, Pipedream, Discord, etc.)
-      const automationUrl = process.env.AUTOMATION_WEBHOOK_URL;
+      let automationUrl = process.env.AUTOMATION_WEBHOOK_URL;
+      
+      // Check if we have a user-specific webhook from Supabase
+      if (supabase) {
+        try {
+          const { data: userData } = await supabase.from('profiles').select('data').ilike('data->>email', email).single();
+          if (userData?.data?.webhook_url) {
+            automationUrl = userData.data.webhook_url;
+          }
+        } catch (e) {}
+      }
+
       if (automationUrl) {
         console.log("Triggering automation webhook...");
         try {
