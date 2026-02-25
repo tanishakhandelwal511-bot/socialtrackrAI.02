@@ -76,13 +76,21 @@ function dbSave() {
 
 async function uLoad() {
   if (!DB.user) return;
+  
+  // Create a timeout promise
+  const timeoutPromise = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Data load timeout')), 5000)
+  );
+
   try {
     // 1. Try loading from Supabase first
-    const { data: profile, error } = await supabase
+    const loadPromise = supabase
       .from('profiles')
       .select('data')
       .eq('id', DB.user.id)
       .single();
+
+    const { data: profile, error } = await Promise.race([loadPromise, timeoutPromise]) as any;
 
     let d: any = null;
 
@@ -1127,7 +1135,7 @@ function init() {
     authErr.classList.add('show');
   }
 
-  // Safety timeout: Remove loader after 5 seconds regardless of auth status
+  // Safety timeout: Remove loader after 8 seconds regardless of auth status
   setTimeout(() => {
     const loader = document.getElementById('app-loading');
     const status = document.getElementById('loading-status');
@@ -1141,7 +1149,7 @@ function init() {
         retryBtn.onclick = () => window.location.reload();
       }
       
-      // After 10 seconds, force remove the loader if still there
+      // After 15 seconds, force remove the loader if still there
       setTimeout(() => {
         const stillThere = document.getElementById('app-loading');
         if (stillThere) {
@@ -1150,9 +1158,9 @@ function init() {
           setTimeout(() => stillThere.remove(), 300);
           if (!DB.user) showPage('login');
         }
-      }, 5000);
+      }, 7000);
     }
-  }, 5000);
+  }, 8000);
 
   // Supabase Auth Listener
   try {
