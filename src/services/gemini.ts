@@ -38,8 +38,9 @@ export class GeminiService {
    * Uses Gemini 3.1 Pro for high-level reasoning.
    */
   static async generateMonthlyPlan(req: MonthlyPlanRequest): Promise<Post[]> {
-    const ai = getAI();
-    const prompt = `
+    try {
+      const ai = getAI();
+      const prompt = `
       You are a world-class Social Media Strategist. 
       Plan a content calendar for ${req.month} ${req.year}.
       
@@ -93,13 +94,33 @@ export class GeminiService {
       }
     });
 
-    const rawData = JSON.parse(response.text || "[]");
-    return rawData.map((item: any) => ({
-      ...item,
-      key: `${req.year}-${String(new Date(`${req.month} 1, ${req.year}`).getMonth() + 1).padStart(2, '0')}-${String(item.d).padStart(2, '0')}`,
-      plt: req.platform,
-      niche: req.niche
-    }));
+    } catch (e: any) {
+      console.error("Gemini API error:", e);
+      if (e.message?.includes("fetch") || e.name === "TypeError") {
+        console.warn("Using Mock AI data due to connection issues.");
+        // Generate mock posts based on frequency
+        const posts: Post[] = [];
+        const days = [1, 3, 5, 8, 10, 12, 15, 17, 19, 22, 24, 26, 29]; // Example days
+        const count = Math.min(days.length, req.frequency * 4);
+        
+        for (let i = 0; i < count; i++) {
+          const ct = req.contentTypes[i % req.contentTypes.length];
+          posts.push({
+            d: days[i],
+            ct,
+            hook: `[Offline Mode] How to master ${req.niche} on ${req.platform}`,
+            cap: `This is a sample post generated while offline. Once your connection is restored, you can regenerate for real AI content! Focus on ${req.niche} and use ${ct} to engage your audience.`,
+            cta: `Follow for more ${req.niche} tips!`,
+            tags: [req.niche.replace(/\s+/g, ''), req.platform.toLowerCase(), 'growth'],
+            key: `${req.year}-${String(new Date(`${req.month} 1, ${req.year}`).getMonth() + 1).padStart(2, '0')}-${String(days[i]).padStart(2, '0')}`,
+            plt: req.platform,
+            niche: req.niche
+          });
+        }
+        return posts;
+      }
+      throw e;
+    }
   }
 
   /**
@@ -107,8 +128,9 @@ export class GeminiService {
    * Uses Gemini 3 Flash for low latency.
    */
   static async chat(message: string, context: any): Promise<string> {
-    const ai = getAI();
-    const systemInstruction = `
+    try {
+      const ai = getAI();
+      const systemInstruction = `
       You are the SocialTrackr AI Growth Assistant. 
       You help users grow on ${context.plt} in the ${context.niche} niche.
       
@@ -135,6 +157,12 @@ export class GeminiService {
       }
     });
 
-    return response.text || "I'm sorry, I couldn't process that request.";
+    } catch (e: any) {
+      console.error("Gemini Chat error:", e);
+      if (e.message?.includes("fetch") || e.name === "TypeError") {
+        return "I'm currently in Offline Mode because I can't reach the AI servers. I can still help you with basic advice, but my advanced reasoning is limited. Try checking your internet connection!";
+      }
+      return "I'm sorry, I encountered an error: " + e.message;
+    }
   }
 }

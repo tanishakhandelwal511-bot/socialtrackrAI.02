@@ -67,6 +67,8 @@
         </div>
         <button class="btn" id="authBtn">Sign in</button>
         <div class="toggle-row"><span id="toggleTxt">Don't have an account?</span> <a id="toggleAuthMode">Create one →</a></div>
+        <div class="div" style="margin-top:20px"><span>or</span></div>
+        <button class="btn-ghost" id="guestBtn" style="width:100%;margin-top:10px;border:1px dashed var(--muted);color:var(--muted)">Continue as Guest (Offline Mode)</button>
       </div>
     </div>
 
@@ -176,7 +178,7 @@
         <div class="app-main-pad">
           <div class="cal-header">
             <div>
-              <div class="cal-title">Growth Dashboard</div>
+              <div class="cal-title">Growth Dashboard <span id="connStatus" style="font-size:10px; padding:2px 6px; border-radius:4px; margin-left:8px; vertical-align:middle;">Checking...</span></div>
               <div class="cal-meta" id="calMeta"></div>
             </div>
             <div class="cal-controls">

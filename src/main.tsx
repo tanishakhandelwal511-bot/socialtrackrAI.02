@@ -395,9 +395,20 @@ async function handleAuth() {
             <strong>Real accounts cannot be created</strong> until this is fixed.
           </p>
           <button id="btnDemoMode" style="background:var(--p); color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">Use Demo Mode (Offline)</button>
+          <button id="btnDiag" style="background:transparent; color:var(--muted); border:1px solid var(--muted); padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; margin-left:8px;">Network Check</button>
           <p style="font-size:11px; margin-top:10px; opacity:0.6;">Demo Mode saves data to your browser only.</p>
         </div>
       `;
+      document.getElementById('btnDiag')?.addEventListener('click', async () => {
+        const url = import.meta.env.VITE_SUPABASE_URL;
+        showToast('Checking connection to ' + url + '...');
+        try {
+          await fetch(url, { mode: 'no-cors' });
+          showToast('✅ Connection to Supabase is OK. Try again.');
+        } catch (e) {
+          showToast('❌ Connection to Supabase FAILED. Your network is blocking it.');
+        }
+      });
       document.getElementById('btnDemoMode')?.addEventListener('click', () => {
         const demoUser = { id: 'demo-user', email: 'demo@example.com', user_metadata: { full_name: 'Demo User' } };
         doLogin(demoUser);
@@ -429,8 +440,19 @@ async function handleGoogleAuth() {
         <div style="text-align:center">
           <p><strong>⚠️ Connection Blocked:</strong> Could not reach Google/Supabase.</p>
           <button id="btnDemoModeGoogle" style="background:var(--p); color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">Use Demo Mode (Offline)</button>
+          <button id="btnDiagGoogle" style="background:transparent; color:var(--muted); border:1px solid var(--muted); padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; margin-top:10px; width:100%;">Network Check</button>
         </div>
       `;
+      document.getElementById('btnDiagGoogle')?.addEventListener('click', async () => {
+        const url = import.meta.env.VITE_SUPABASE_URL;
+        showToast('Checking connection...');
+        try {
+          await fetch(url, { mode: 'no-cors' });
+          showToast('✅ Connection OK. Try again.');
+        } catch (e) {
+          showToast('❌ Connection FAILED. Network is blocking Supabase.');
+        }
+      });
       document.getElementById('btnDemoModeGoogle')?.addEventListener('click', () => {
         const demoUser = { id: 'demo-user', email: 'demo@example.com', user_metadata: { full_name: 'Demo User' } };
         doLogin(demoUser);
@@ -922,6 +944,19 @@ function updateStats() {
   const pct = planned ? Math.round((done / planned) * 100) : 0;
   const totalViews = U.metrics.reduce((acc, m) => acc + m.views, 0);
 
+  const conn = document.getElementById('connStatus');
+  if (conn) {
+    if (DB.user?.id === 'demo-user') {
+      conn.textContent = 'OFFLINE MODE';
+      conn.style.background = 'rgba(255,107,107,0.1)';
+      conn.style.color = '#FF6B6B';
+    } else {
+      conn.textContent = 'SYNCED';
+      conn.style.background = 'rgba(46,213,115,0.1)';
+      conn.style.color = '#2ED573';
+    }
+  }
+
   document.getElementById('streakVal')!.textContent = String(U.streak);
   document.getElementById('qPlanned')!.textContent = String(planned);
   document.getElementById('qDone')!.textContent = String(done);
@@ -1006,6 +1041,11 @@ function renderAnalytics() {
     <div class="an-header">
       <h1 class="an-title">Growth Analytics</h1>
       <p class="an-sub">Tracking your progress in the ${U.ob.niche} niche on ${U.ob.plt}.</p>
+      ${DB.user?.id === 'demo-user' ? `
+        <div style="background:rgba(255,107,107,0.1); color:#FF6B6B; padding:10px 16px; border-radius:10px; font-size:12px; margin-top:16px; border:1px solid rgba(255,107,107,0.1); display:inline-block;">
+          ⚠️ <strong>Offline Mode:</strong> Data is only saved to this browser.
+        </div>
+      ` : ''}
     </div>
     
     <div class="an-grid">
@@ -1172,6 +1212,32 @@ function init() {
   dbLoad();
   applyDark();
   
+  // Proactive Connection Test
+  const testConnection = async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      if (url && !url.includes('placeholder')) {
+        await fetch(url, { mode: 'no-cors', signal: controller.signal });
+        clearTimeout(timeoutId);
+      }
+    } catch (e) {
+      console.warn('Supabase connection test failed. User may be offline or blocked.');
+      const authErr = document.getElementById('authErr');
+      if (authErr && !DB.user) {
+        authErr.innerHTML = `
+          <div style="background:rgba(255,107,107,0.1); color:#FF6B6B; padding:12px; border-radius:12px; font-size:13px; margin-bottom:16px; border:1px solid rgba(255,107,107,0.2); text-align:center;">
+            <strong>📡 Connection Issue Detected</strong><br>
+            We're having trouble reaching the database. You can still use the app in <strong>Offline Mode</strong>.
+          </div>
+        `;
+        authErr.classList.add('show');
+      }
+    }
+  };
+  testConnection();
+  
   // Check Supabase Config
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -1267,6 +1333,11 @@ function init() {
   // Event Listeners
   document.getElementById('authBtn')?.addEventListener('click', handleAuth);
   document.getElementById('googleAuthBtn')?.addEventListener('click', handleGoogleAuth);
+  document.getElementById('guestBtn')?.addEventListener('click', () => {
+    const demoUser = { id: 'demo-user', email: 'demo@example.com', user_metadata: { full_name: 'Guest User' } };
+    doLogin(demoUser);
+    showToast('Logged in as Guest (Offline Mode) 🚀');
+  });
   document.getElementById('toggleAuthMode')?.addEventListener('click', toggleAuthMode);
   document.getElementById('obNextBtn')?.addEventListener('click', () => {
     if (U.obStep < 4) {
