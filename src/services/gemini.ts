@@ -72,7 +72,7 @@ export class GeminiService {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-pro-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -95,6 +95,11 @@ export class GeminiService {
     });
 
     const rawData = JSON.parse(response.text || "[]");
+    if (!Array.isArray(rawData) || rawData.length === 0) {
+      console.warn("Gemini returned empty or invalid data, falling back to mock.");
+      throw new Error("Empty AI response");
+    }
+
     return rawData.map((item: any) => ({
       ...item,
       key: `${req.year}-${String(new Date(`${req.month} 1, ${req.year}`).getMonth() + 1).padStart(2, '0')}-${String(item.d).padStart(2, '0')}`,

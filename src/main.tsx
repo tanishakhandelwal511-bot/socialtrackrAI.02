@@ -664,7 +664,9 @@ async function startGeneration(theme?: string, tone?: string) {
     console.error("Generation error:", e);
     const msg = e.message || "AI Generation failed. Please try again.";
     showToast(msg);
-    showPage('ob');
+    // If we have data, go back to dash, otherwise go to onboarding
+    if (Object.keys(U.cal).length > 0) goto('dash');
+    else showPage('ob');
   }
 }
 
@@ -680,8 +682,14 @@ function renderCal() {
   const firstDOW = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m + 1, 0).getDate();
   
+  // Get days in previous month for padding
+  const prevMonthLastDay = new Date(y, m, 0).getDate();
+  
   let html = '';
-  for (let i = 0; i < firstDOW; i++) html += '<div class="cal-cell other"></div>';
+  // Padding from previous month
+  for (let i = firstDOW - 1; i >= 0; i--) {
+    html += `<div class="cal-cell other"><div class="cal-num">${prevMonthLastDay - i}</div></div>`;
+  }
   
   const todayStr = new Date().toISOString().split('T')[0];
   const upcoming: Post[] = [];
@@ -708,6 +716,13 @@ function renderCal() {
         <div class="cal-flame">🔥</div>
       </div>
     `;
+  }
+  
+  // Padding for next month to fill the grid (6 rows * 7 days = 42 cells)
+  const totalCells = firstDOW + daysInMonth;
+  const remaining = 42 - totalCells;
+  for (let i = 1; i <= remaining; i++) {
+    html += `<div class="cal-cell other"><div class="cal-num">${i}</div></div>`;
   }
   
   grid.innerHTML = html;
@@ -908,7 +923,7 @@ function updateStats() {
     else streakStatus.textContent = '❄️ Cold';
   }
   if (streakNext) {
-    const nextMilestone = Math.ceil((U.streak + 1) / 3) * 3;
+    const nextMilestone = Math.ceil((U.streak + 1) / 7) * 7;
     streakNext.textContent = `Next milestone: ${nextMilestone} days 🏆`;
   }
 
@@ -1174,41 +1189,9 @@ function init() {
           <li><strong>Enable Auth:</strong> Go to Authentication -> Sign-in method -> Enable Email/Password and Google.</li>
           <li><strong>Enable Firestore:</strong> Go to Firestore Database -> Create database.</li>
         </ol>
-
-        <button id="debugEnvBtn" style="background:rgba(108,92,231,0.2); color:var(--p); border:1px solid var(--p); padding:8px 12px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600;">
-          🔍 Check Detected Secrets
-        </button>
-        <div id="debugEnvRes" style="margin-top:12px; font-family:monospace; font-size:11px; display:none; background:white; padding:10px; border-radius:8px; border:1px solid #E2E8F0;"></div>
       </div>
     `;
     authErr.classList.add('show');
-
-    document.getElementById('debugEnvBtn')?.addEventListener('click', () => {
-      const res = document.getElementById('debugEnvRes')!;
-      res.style.display = 'block';
-      const vars = [
-        'VITE_FIREBASE_API_KEY',
-        'VITE_FIREBASE_AUTH_DOMAIN',
-        'VITE_FIREBASE_PROJECT_ID',
-        'VITE_FIREBASE_STORAGE_BUCKET',
-        'VITE_FIREBASE_MESSAGING_SENDER_ID',
-        'VITE_FIREBASE_APP_ID'
-      ];
-      
-      const results = vars.map(v => {
-        const val = import.meta.env[v];
-        const status = val ? `✅ Found (${val.substring(0, 3)}...)` : '❌ NOT FOUND';
-        return `<div>${v}: ${status}</div>`;
-      }).join('');
-      
-      res.innerHTML = `
-        <div style="font-weight:bold; margin-bottom:8px;">Detected Variables:</div>
-        ${results}
-        <div style="margin-top:10px; color:#64748b; font-size:10px;">
-          If any say "NOT FOUND", ensure you added them to the <b>Secrets</b> panel with the <b>VITE_</b> prefix.
-        </div>
-      `;
-    });
   }
 
   // Safety timeout: Remove loader after 8 seconds regardless of auth status
@@ -1306,25 +1289,6 @@ function init() {
   document.getElementById('navAn3')?.addEventListener('click', () => goto('an'));
   document.getElementById('navAi3')?.addEventListener('click', () => goto('ai'));
 
-  const openAutomationSettings = async () => {
-    const url = await openModal({
-      title: 'Automation Settings',
-      desc: 'Enter your Webhook URL (Make.com, Pipedream, or Discord) to trigger automations when you hit milestones.',
-      input: U.webhook_url || '',
-      confirmTxt: 'Save Settings',
-      icon: '⚙️'
-    });
-    if (url !== false) {
-      U.webhook_url = url as string;
-      uSave();
-      showToast('Automation settings saved! 🚀');
-    }
-  };
-
-  document.getElementById('btnSettings')?.addEventListener('click', openAutomationSettings);
-  document.getElementById('btnSettings2')?.addEventListener('click', openAutomationSettings);
-  document.getElementById('btnSettings3')?.addEventListener('click', openAutomationSettings);
-  
   const signOut = async () => {
     await firebaseSignOut(auth);
   };
@@ -1349,6 +1313,11 @@ function init() {
   document.getElementById('btnNextMonth')?.addEventListener('click', () => {
     U.calM++;
     if (U.calM > 11) { U.calM = 0; U.calY++; }
+    renderCal();
+  });
+  document.getElementById('btnToday')?.addEventListener('click', () => {
+    U.calM = new Date().getMonth();
+    U.calY = new Date().getFullYear();
     renderCal();
   });
   document.getElementById('btnRegen')?.addEventListener('click', async () => {

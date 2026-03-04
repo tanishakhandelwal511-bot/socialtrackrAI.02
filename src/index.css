@@ -588,7 +588,8 @@ h1,h2,h3,h4{font-family:'Syne',sans-serif;}
   transition:transform .16s ease,box-shadow .16s ease,border-color .14s;
   contain:strict;
 }
-.cal-cell.other{opacity:.15;pointer-events:none;background:transparent;border-color:transparent;}
+.cal-cell.other{opacity:.35;pointer-events:none;background:rgba(0,0,0,0.02);border-color:var(--border-soft);}
+.dark .cal-cell.other{background:rgba(255,255,255,0.02);}
 .cal-cell.has-post{cursor:pointer;background:var(--surface);box-shadow:0 1px 4px rgba(0,0,0,.04);}
 .cal-cell.has-post:hover{
   transform:translateY(-2px);

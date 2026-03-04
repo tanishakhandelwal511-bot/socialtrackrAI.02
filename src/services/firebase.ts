@@ -19,14 +19,10 @@ const isConfigured = firebaseConfig.apiKey &&
 let app;
 if (isConfigured) {
   try {
-    console.log(`Initializing Firebase with API Key starting with: ${firebaseConfig.apiKey?.substring(0, 4)}...`);
     app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-    console.log("Firebase initialized successfully.");
   } catch (e) {
     console.error("Firebase initialization failed:", e);
   }
-} else {
-  console.warn("Firebase not configured or invalid API key provided. Key found:", firebaseConfig.apiKey ? `${firebaseConfig.apiKey.substring(0, 4)}...` : 'none');
 }
 
 // Export services (they might be null if not configured, which we handle in main.tsx)
