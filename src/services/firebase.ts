@@ -30,6 +30,6 @@ if (isConfigured) {
 }
 
 // Export services (they might be null if not configured, which we handle in main.tsx)
-export const auth = app ? getAuth(app) : ({} as any);
-export const db = app ? getFirestore(app) : ({} as any);
+export const auth = app ? getAuth(app) : null;
+export const db = app ? getFirestore(app) : null;
 export const googleProvider = new GoogleAuthProvider();

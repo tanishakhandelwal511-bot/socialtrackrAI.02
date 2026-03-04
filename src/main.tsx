@@ -105,21 +105,25 @@ async function uLoad() {
     setTimeout(() => reject(new Error('Data load timeout')), 5000)
   );
 
+  let d: any = null;
+
   try {
     // 1. Try loading from Firestore first
-    console.log('Attempting to load data from Firestore for user:', DB.user.id);
-    const docRef = doc(db, "profiles", DB.user.id);
-    const loadPromise = getDoc(docRef);
+    if (db) {
+      console.log('Attempting to load data from Firestore for user:', DB.user.id);
+      const docRef = doc(db, "profiles", DB.user.id);
+      const loadPromise = getDoc(docRef);
 
-    const docSnap = await Promise.race([loadPromise, timeoutPromise]) as any;
+      const docSnap = await Promise.race([loadPromise, timeoutPromise]) as any;
 
-    let d: any = null;
-
-    if (docSnap.exists()) {
-      console.log('✅ Successfully loaded data from Firestore');
-      d = docSnap.data().data;
-    } else {
-      console.log('ℹ️ No document found in Firestore, checking local storage fallback');
+      if (docSnap.exists()) {
+        console.log('✅ Successfully loaded data from Firestore');
+        d = docSnap.data().data;
+      }
+    }
+    
+    if (!d) {
+      console.log('ℹ️ No document found in Firestore (or db not ready), checking local storage fallback');
       const raw = localStorage.getItem('st_u_' + DB.user.id);
       if (raw) d = JSON.parse(raw);
     }
@@ -162,15 +166,17 @@ async function uSave() {
   if (!isConfigured) return;
 
   // 2. Sync to Firestore (Upsert)
-  try {
-    const docRef = doc(db, "profiles", DB.user.id);
-    await setDoc(docRef, {
-      id: DB.user.id,
-      data: data,
-      updated_at: new Date().toISOString()
-    }, { merge: true });
-  } catch (e) {
-    console.error('Firestore sync failed:', e);
+  if (db) {
+    try {
+      const docRef = doc(db, "profiles", DB.user.id);
+      await setDoc(docRef, {
+        id: DB.user.id,
+        data: data,
+        updated_at: new Date().toISOString()
+      }, { merge: true });
+    } catch (e) {
+      console.error('Firestore sync failed:', e);
+    }
   }
 }
 
@@ -1168,9 +1174,41 @@ function init() {
           <li><strong>Enable Auth:</strong> Go to Authentication -> Sign-in method -> Enable Email/Password and Google.</li>
           <li><strong>Enable Firestore:</strong> Go to Firestore Database -> Create database.</li>
         </ol>
+
+        <button id="debugEnvBtn" style="background:rgba(108,92,231,0.2); color:var(--p); border:1px solid var(--p); padding:8px 12px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600;">
+          🔍 Check Detected Secrets
+        </button>
+        <div id="debugEnvRes" style="margin-top:12px; font-family:monospace; font-size:11px; display:none; background:white; padding:10px; border-radius:8px; border:1px solid #E2E8F0;"></div>
       </div>
     `;
     authErr.classList.add('show');
+
+    document.getElementById('debugEnvBtn')?.addEventListener('click', () => {
+      const res = document.getElementById('debugEnvRes')!;
+      res.style.display = 'block';
+      const vars = [
+        'VITE_FIREBASE_API_KEY',
+        'VITE_FIREBASE_AUTH_DOMAIN',
+        'VITE_FIREBASE_PROJECT_ID',
+        'VITE_FIREBASE_STORAGE_BUCKET',
+        'VITE_FIREBASE_MESSAGING_SENDER_ID',
+        'VITE_FIREBASE_APP_ID'
+      ];
+      
+      const results = vars.map(v => {
+        const val = import.meta.env[v];
+        const status = val ? `✅ Found (${val.substring(0, 3)}...)` : '❌ NOT FOUND';
+        return `<div>${v}: ${status}</div>`;
+      }).join('');
+      
+      res.innerHTML = `
+        <div style="font-weight:bold; margin-bottom:8px;">Detected Variables:</div>
+        ${results}
+        <div style="margin-top:10px; color:#64748b; font-size:10px;">
+          If any say "NOT FOUND", ensure you added them to the <b>Secrets</b> panel with the <b>VITE_</b> prefix.
+        </div>
+      `;
+    });
   }
 
   // Safety timeout: Remove loader after 8 seconds regardless of auth status
@@ -1201,7 +1239,7 @@ function init() {
   }, 8000);
 
   // Firebase Auth Listener
-  if (isConfigured) {
+  if (isConfigured && auth) {
     console.log("Firebase is configured. Listening for auth changes...");
     onAuthStateChanged(auth, async (user) => {
       console.log('Auth state changed:', user ? `User logged in: ${user.email}` : 'No user logged in');
