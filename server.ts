@@ -1,7 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import { Resend } from "resend";
-import { createClient } from "@supabase/supabase-js";
+import * as admin from "firebase-admin";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -12,10 +12,25 @@ const __dirname = path.dirname(__filename);
 console.log("Starting SocialTrackr Server...");
 dotenv.config();
 
-// Initialize Supabase
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+// Initialize Firebase Admin
+if (process.env.VITE_FIREBASE_PROJECT_ID) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+    });
+    console.log("Firebase Admin initialized.");
+  } catch (e) {
+    console.warn("Firebase Admin initialization failed. applicationDefault() might not be available. Falling back to project ID only.");
+    admin.initializeApp({
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+    });
+  }
+} else {
+  console.warn("VITE_FIREBASE_PROJECT_ID missing. Firebase Admin not initialized.");
+}
+
+const db = admin.apps.length ? admin.firestore() : null;
 
 // Initialize Resend lazily
 let resendClient: Resend | null = null;
@@ -34,7 +49,7 @@ async function startServer() {
 
   // Health check for Render
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString(), supabase: !!supabase });
+    res.json({ status: "ok", timestamp: new Date().toISOString(), firebase: !!db });
   });
 
   app.get("/favicon.ico", (req, res) => {
@@ -63,40 +78,29 @@ async function startServer() {
     try {
       console.log(`Attempting to send email to ${email} for ${streak}-day streak...`);
       
-      // 1. Log to Supabase if available
-      if (supabase) {
+      // 1. Log to Firestore if available
+      let userData: any = null;
+      if (db) {
         try {
-          // Get user ID by email to log correctly
-          // We use maybeSingle() to avoid throwing if not found
-          const { data: userData, error: userError } = await supabase
-            .from('profiles')
-            .select('id, data')
-            .filter('data->>email', 'eq', email)
-            .maybeSingle();
+          // Get user by email
+          const profilesRef = db.collection('profiles');
+          const snapshot = await profilesRef.where('data.email', '==', email).limit(1).get();
           
-          if (userError) {
-            console.warn("Supabase profile lookup error:", userError.message);
+          if (!snapshot.empty) {
+            const doc = snapshot.docs[0];
+            userData = { id: doc.id, data: doc.data().data };
           }
 
-          const { error: insertError } = await supabase.from('milestones').insert({
+          await db.collection('milestones').add({
             user_id: userData?.id || null,
             email,
             streak,
             metadata: { name, timestamp: new Date().toISOString() }
           });
 
-          if (insertError) {
-            console.warn("Supabase milestone insert error (table might not exist yet):", insertError.message);
-          } else {
-            console.log("Milestone logged to Supabase successfully.");
-          }
-          
-          // If user has a custom webhook in their data, use it
-          if (userData?.data?.webhook_url) {
-            console.log("User has a custom webhook URL in their profile.");
-          }
+          console.log("Milestone logged to Firestore successfully.");
         } catch (dbErr) {
-          console.error("Failed to log milestone to Supabase:", dbErr);
+          console.error("Failed to log milestone to Firestore:", dbErr);
         }
       }
 
@@ -166,22 +170,10 @@ async function startServer() {
       // Free Automation Integration (Make.com, Pipedream, Discord, etc.)
       let automationUrl = process.env.AUTOMATION_WEBHOOK_URL;
       
-      // Check if we have a user-specific webhook from Supabase
-      if (supabase) {
-        try {
-          const { data: userData } = await supabase
-            .from('profiles')
-            .select('data')
-            .filter('data->>email', 'eq', email)
-            .maybeSingle();
-            
-          if (userData?.data?.webhook_url) {
-            automationUrl = userData.data.webhook_url;
-            console.log("Using user-specific webhook URL from Supabase profile.");
-          }
-        } catch (e) {
-          console.warn("Failed to fetch user-specific webhook:", e);
-        }
+      // Check if we have a user-specific webhook from Firestore
+      if (userData?.data?.webhook_url) {
+        automationUrl = userData.data.webhook_url;
+        console.log("Using user-specific webhook URL from Firestore profile.");
       }
 
       if (automationUrl) {

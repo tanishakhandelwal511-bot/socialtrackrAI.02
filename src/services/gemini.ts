@@ -94,6 +94,13 @@ export class GeminiService {
       }
     });
 
+    const rawData = JSON.parse(response.text || "[]");
+    return rawData.map((item: any) => ({
+      ...item,
+      key: `${req.year}-${String(new Date(`${req.month} 1, ${req.year}`).getMonth() + 1).padStart(2, '0')}-${String(item.d).padStart(2, '0')}`,
+      plt: req.platform,
+      niche: req.niche
+    }));
     } catch (e: any) {
       console.error("Gemini API error:", e);
       if (e.message?.includes("fetch") || e.name === "TypeError") {
@@ -157,6 +164,7 @@ export class GeminiService {
       }
     });
 
+    return response.text || "I'm sorry, I couldn't process that request.";
     } catch (e: any) {
       console.error("Gemini Chat error:", e);
       if (e.message?.includes("fetch") || e.name === "TypeError") {

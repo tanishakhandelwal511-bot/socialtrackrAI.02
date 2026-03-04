@@ -1,5 +1,7 @@
 import { GeminiService, Post } from './services/gemini.ts';
-import { supabase } from './services/supabase.ts';
+import { auth, db, googleProvider } from './services/firebase.ts';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithPopup, signOut as firebaseSignOut } from "firebase/auth";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import './index.css';
 
 // ═══════════════════════════════════════════════════════
@@ -77,9 +79,12 @@ function dbSave() {
 async function uLoad() {
   if (!DB.user) return;
   
-  // Skip Supabase for demo user
-  if (DB.user.id === 'demo-user') {
-    const raw = localStorage.getItem('st_u_demo-user');
+  // Skip Firebase if not configured
+  const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+  const isConfigured = firebaseApiKey && !firebaseApiKey.includes('placeholder');
+  
+  if (!isConfigured) {
+    const raw = localStorage.getItem('st_u_' + DB.user.id);
     if (raw) {
       const d = JSON.parse(raw);
       U.ob = d.ob || { plt: null, niche: null, cts: [], freq: null };
@@ -94,30 +99,27 @@ async function uLoad() {
     }
     return;
   }
-  
+
   // Create a timeout promise
   const timeoutPromise = new Promise((_, reject) => 
     setTimeout(() => reject(new Error('Data load timeout')), 5000)
   );
 
   try {
-    // 1. Try loading from Supabase first
-    const loadPromise = supabase
-      .from('profiles')
-      .select('data')
-      .eq('id', DB.user.id)
-      .single();
+    // 1. Try loading from Firestore first
+    const docRef = doc(db, "profiles", DB.user.id);
+    const loadPromise = getDoc(docRef);
 
-    const { data: profile, error } = await Promise.race([loadPromise, timeoutPromise]) as any;
+    const docSnap = await Promise.race([loadPromise, timeoutPromise]) as any;
 
     let d: any = null;
 
-    if (!error && profile?.data) {
-      console.log('Loaded data from Supabase');
-      d = profile.data;
+    if (docSnap.exists()) {
+      console.log('Loaded data from Firestore');
+      d = docSnap.data().data;
     } else {
       // 2. Fallback to local storage for migration or offline
-      console.log('Supabase load failed or empty, trying local storage');
+      console.log('Firestore load failed or empty, trying local storage');
       const raw = localStorage.getItem('st_u_' + DB.user.id);
       if (raw) d = JSON.parse(raw);
     }
@@ -154,28 +156,21 @@ async function uSave() {
   localStorage.setItem('st_u_' + DB.user.id, JSON.stringify(data));
   localStorage.setItem('st_dark', String(U.dark));
 
-  // Skip Supabase for demo user
-  if (DB.user.id === 'demo-user') return;
+  // Skip Firebase if not configured
+  const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+  const isConfigured = firebaseApiKey && !firebaseApiKey.includes('placeholder');
+  if (!isConfigured) return;
 
-  // 2. Sync to Supabase (Upsert)
+  // 2. Sync to Firestore (Upsert)
   try {
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({ 
-        id: DB.user.id, 
-        data: data,
-        updated_at: new Date().toISOString()
-      });
-    
-    if (error) {
-      if (error.code === '42P01') {
-        console.warn('Supabase "profiles" table not found. Data saved locally only.');
-      } else {
-        console.error('Supabase sync error:', error);
-      }
-    }
+    const docRef = doc(db, "profiles", DB.user.id);
+    await setDoc(docRef, {
+      id: DB.user.id,
+      data: data,
+      updated_at: new Date().toISOString()
+    }, { merge: true });
   } catch (e) {
-    console.error('Supabase sync failed:', e);
+    console.error('Firestore sync failed:', e);
   }
 }
 
@@ -343,6 +338,12 @@ function toggleAuthMode() {
 }
 
 async function handleAuth() {
+  const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+  if (!firebaseApiKey || firebaseApiKey.includes('placeholder')) {
+    showToast('⚠️ Please configure Firebase in Secrets first.');
+    return;
+  }
+
   const email = (document.getElementById('emailIn') as HTMLInputElement).value.trim().toLowerCase();
   const pass = (document.getElementById('passIn') as HTMLInputElement).value;
   const authErr = document.getElementById('authErr')!;
@@ -365,58 +366,15 @@ async function handleAuth() {
         authErr.classList.add('show');
         return;
       }
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: pass,
-        options: {
-          data: { full_name: name }
-        }
-      });
-      if (error) throw error;
-      if (data.user) {
-        showToast('Account created! Please check your email for verification.');
-        // Supabase might auto-login depending on settings, but we'll wait for onAuthStateChange
-      }
+      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+      await updateProfile(userCredential.user, { displayName: name });
+      showToast('Account created!');
     } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password: pass,
-      });
-      if (error) throw error;
+      await signInWithEmailAndPassword(auth, email, pass);
     }
   } catch (e: any) {
     console.error('Auth error:', e);
-    if (e.message === 'Failed to fetch' || e.name === 'TypeError') {
-      authErr.innerHTML = `
-        <div style="text-align:center">
-          <p><strong>⚠️ Connection Blocked:</strong> Could not reach the database.</p>
-          <p style="font-size:12px; opacity:0.8; margin-bottom:10px;">
-            Your network is blocking the connection to Supabase. 
-            <strong>Real accounts cannot be created</strong> until this is fixed.
-          </p>
-          <button id="btnDemoMode" style="background:var(--p); color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">Use Demo Mode (Offline)</button>
-          <button id="btnDiag" style="background:transparent; color:var(--muted); border:1px solid var(--muted); padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; margin-left:8px;">Network Check</button>
-          <p style="font-size:11px; margin-top:10px; opacity:0.6;">Demo Mode saves data to your browser only.</p>
-        </div>
-      `;
-      document.getElementById('btnDiag')?.addEventListener('click', async () => {
-        const url = import.meta.env.VITE_SUPABASE_URL;
-        showToast('Checking connection to ' + url + '...');
-        try {
-          await fetch(url, { mode: 'no-cors' });
-          showToast('✅ Connection to Supabase is OK. Try again.');
-        } catch (e) {
-          showToast('❌ Connection to Supabase FAILED. Your network is blocking it.');
-        }
-      });
-      document.getElementById('btnDemoMode')?.addEventListener('click', () => {
-        const demoUser = { id: 'demo-user', email: 'demo@example.com', user_metadata: { full_name: 'Demo User' } };
-        doLogin(demoUser);
-        showToast('Running in Demo Mode (Local Storage only) 🚀');
-      });
-    } else {
-      authErr.textContent = e.message || 'Authentication failed.';
-    }
+    authErr.textContent = e.message || 'Authentication failed.';
     authErr.classList.add('show');
   } finally {
     authBtn.disabled = false;
@@ -425,51 +383,27 @@ async function handleAuth() {
 }
 
 async function handleGoogleAuth() {
+  const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+  if (!firebaseApiKey || firebaseApiKey.includes('placeholder')) {
+    showToast('⚠️ Please configure Firebase in Secrets first.');
+    return;
+  }
+
   try {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin
-      }
-    });
-    if (error) throw error;
+    await signInWithPopup(auth, googleProvider);
   } catch (e: any) {
     const authErr = document.getElementById('authErr')!;
-    if (e.message === 'Failed to fetch' || e.name === 'TypeError') {
-      authErr.innerHTML = `
-        <div style="text-align:center">
-          <p><strong>⚠️ Connection Blocked:</strong> Could not reach Google/Supabase.</p>
-          <button id="btnDemoModeGoogle" style="background:var(--p); color:white; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">Use Demo Mode (Offline)</button>
-          <button id="btnDiagGoogle" style="background:transparent; color:var(--muted); border:1px solid var(--muted); padding:8px 16px; border-radius:8px; cursor:pointer; font-size:13px; margin-top:10px; width:100%;">Network Check</button>
-        </div>
-      `;
-      document.getElementById('btnDiagGoogle')?.addEventListener('click', async () => {
-        const url = import.meta.env.VITE_SUPABASE_URL;
-        showToast('Checking connection...');
-        try {
-          await fetch(url, { mode: 'no-cors' });
-          showToast('✅ Connection OK. Try again.');
-        } catch (e) {
-          showToast('❌ Connection FAILED. Network is blocking Supabase.');
-        }
-      });
-      document.getElementById('btnDemoModeGoogle')?.addEventListener('click', () => {
-        const demoUser = { id: 'demo-user', email: 'demo@example.com', user_metadata: { full_name: 'Demo User' } };
-        doLogin(demoUser);
-      });
-    } else {
-      authErr.textContent = e.message || 'Google Auth failed.';
-    }
+    authErr.textContent = e.message || 'Google Auth failed.';
     authErr.classList.add('show');
   }
 }
 
 async function doLogin(user: any) {
-  DB.session = user.id;
+  DB.session = user.uid || user.id;
   DB.user = {
-    id: user.id,
+    id: user.uid || user.id,
     email: user.email || '',
-    name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
+    name: user.displayName || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
   };
   dbSave();
   resetU();
@@ -1212,45 +1146,33 @@ function init() {
   dbLoad();
   applyDark();
   
-  // Proactive Connection Test
-  const testConnection = async () => {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      const url = import.meta.env.VITE_SUPABASE_URL;
-      if (url && !url.includes('placeholder')) {
-        await fetch(url, { mode: 'no-cors', signal: controller.signal });
-        clearTimeout(timeoutId);
-      }
-    } catch (e) {
-      console.warn('Supabase connection test failed. User may be offline or blocked.');
-      const authErr = document.getElementById('authErr');
-      if (authErr && !DB.user) {
-        authErr.innerHTML = `
-          <div style="background:rgba(255,107,107,0.1); color:#FF6B6B; padding:12px; border-radius:12px; font-size:13px; margin-bottom:16px; border:1px solid rgba(255,107,107,0.2); text-align:center;">
-            <strong>📡 Connection Issue Detected</strong><br>
-            We're having trouble reaching the database. You can still use the app in <strong>Offline Mode</strong>.
-          </div>
-        `;
-        authErr.classList.add('show');
-      }
-    }
-  };
-  testConnection();
+  // Check Firebase Config
+  const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+  const authErr = document.getElementById('authErr')!;
   
-  // Check Supabase Config
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  
-  if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
-    const authErr = document.getElementById('authErr')!;
-    const isRender = window.location.hostname.includes('render.com');
+  const isConfigured = firebaseApiKey && !firebaseApiKey.includes('placeholder');
+
+  if (!isConfigured) {
     authErr.innerHTML = `
-      <div style="background:var(--el); color:var(--err); padding:12px; border-radius:8px; font-size:13px; margin-bottom:16px; border:1px solid var(--err);">
-        <strong>⚠️ Supabase Not Configured</strong><br>
-        ${isRender 
-          ? 'On Render: Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to your <strong>Environment Variables</strong> and <strong>Clear Cache & Redeploy</strong>.' 
-          : 'Please add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to your Secrets.'}
+      <div style="background:rgba(108,92,231,0.1); color:var(--p); padding:20px; border-radius:16px; font-size:14px; margin-bottom:24px; border:1px solid rgba(108,92,231,0.2); line-height:1.6;">
+        <h3 style="margin:0 0 12px 0; font-family:'Syne', sans-serif;">🚀 Final Step: Connect your Firebase</h3>
+        <p style="margin-bottom:16px; opacity:0.8;">To enable <strong>Google Login</strong> and save your data, you need a Firebase project.</p>
+        
+        <ol style="padding-left:20px; margin-bottom:20px;">
+          <li>Go to <a href="https://console.firebase.google.com/" target="_blank" style="color:var(--p); font-weight:600;">Firebase Console</a> and create a project.</li>
+          <li>Add a Web App to your project.</li>
+          <li>Copy the <strong>firebaseConfig</strong> object.</li>
+          <li>Paste the values into the <strong>Secrets</strong> panel in AI Studio as:<br>
+            <code>VITE_FIREBASE_API_KEY</code><br>
+            <code>VITE_FIREBASE_AUTH_DOMAIN</code><br>
+            <code>VITE_FIREBASE_PROJECT_ID</code><br>
+            <code>VITE_FIREBASE_STORAGE_BUCKET</code><br>
+            <code>VITE_FIREBASE_MESSAGING_SENDER_ID</code><br>
+            <code>VITE_FIREBASE_APP_ID</code>
+          </li>
+          <li><strong>Enable Auth:</strong> Go to Authentication -> Sign-in method -> Enable Email/Password and Google.</li>
+          <li><strong>Enable Firestore:</strong> Go to Firestore Database -> Create database.</li>
+        </ol>
       </div>
     `;
     authErr.classList.add('show');
@@ -1270,20 +1192,6 @@ function init() {
         retryBtn.onclick = () => window.location.reload();
       }
       
-      const demoBtn = document.createElement('button');
-      demoBtn.textContent = 'Try Demo Mode';
-      demoBtn.style.cssText = 'display:block;margin:10px auto;background:transparent;color:#6C5CE7;border:1px solid #6C5CE7;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;';
-      demoBtn.onclick = () => {
-        const demoUser = { id: 'demo-user', email: 'demo@example.com', user_metadata: { full_name: 'Demo User' } };
-        doLogin(demoUser);
-        const loader = document.getElementById('app-loading');
-        if (loader) {
-          loader.style.opacity = '0';
-          setTimeout(() => loader.remove(), 300);
-        }
-      };
-      retryBtn?.parentNode?.appendChild(demoBtn);
-      
       // After 15 seconds, force remove the loader if still there
       setTimeout(() => {
         const stillThere = document.getElementById('app-loading');
@@ -1297,13 +1205,13 @@ function init() {
     }
   }, 8000);
 
-  // Supabase Auth Listener
-  try {
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth event:', event);
+  // Firebase Auth Listener
+  if (isConfigured) {
+    onAuthStateChanged(auth, async (user) => {
+      console.log('Auth state changed:', user);
       try {
-        if (session?.user) {
-          await doLogin(session.user);
+        if (user) {
+          await doLogin(user);
         } else {
           DB.session = null;
           DB.user = null;
@@ -1323,21 +1231,19 @@ function init() {
         }
       }
     });
-  } catch (err) {
-    console.error('Supabase auth listener failed:', err);
+  } else {
+    // Not configured - just show login page and remove loader
     const loader = document.getElementById('app-loading');
-    if (loader) loader.remove();
+    if (loader) {
+      loader.style.opacity = '0';
+      setTimeout(() => loader.remove(), 300);
+    }
     showPage('login');
   }
 
   // Event Listeners
   document.getElementById('authBtn')?.addEventListener('click', handleAuth);
   document.getElementById('googleAuthBtn')?.addEventListener('click', handleGoogleAuth);
-  document.getElementById('guestBtn')?.addEventListener('click', () => {
-    const demoUser = { id: 'demo-user', email: 'demo@example.com', user_metadata: { full_name: 'Guest User' } };
-    doLogin(demoUser);
-    showToast('Logged in as Guest (Offline Mode) 🚀');
-  });
   document.getElementById('toggleAuthMode')?.addEventListener('click', toggleAuthMode);
   document.getElementById('obNextBtn')?.addEventListener('click', () => {
     if (U.obStep < 4) {
@@ -1386,7 +1292,7 @@ function init() {
   document.getElementById('btnSettings3')?.addEventListener('click', openAutomationSettings);
   
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await firebaseSignOut(auth);
   };
   document.getElementById('navSignOut')?.addEventListener('click', signOut);
   document.getElementById('navSignOut2')?.addEventListener('click', signOut);
