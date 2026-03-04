@@ -59,16 +59,12 @@ export class GeminiService {
       5. Viral Potential: Include at least 2 "contrarian" or "hot take" ideas to spark debate.
       6. Actionable Value: Ensure educational posts have clear, step-by-step takeaways.
       
-      IDEAS FOR VARIETY:
-      - Behind the scenes / Day in the life
-      - Common myths in the ${req.niche} niche
-      - "How I started" vs "How it's going"
-      - Quick tips / Life hacks
-      - Industry news commentary
+      IMPORTANT: 
+      - Return EXACTLY ${req.frequency * 4} to ${req.frequency * 5} posts for the month.
+      - Distribute them evenly across the month (e.g. if 3x week, use Mon/Wed/Fri).
+      - Keep hooks and captions concise but high-impact. Captions should be under 300 characters.
       
-      IMPORTANT: Keep hooks and captions concise but high-impact. Captions should be under 300 characters.
-      
-      Return a JSON array of post objects for the scheduled days.
+      Return a JSON array of post objects.
     `;
 
     const response = await ai.models.generateContent({
@@ -100,9 +96,13 @@ export class GeminiService {
       throw new Error("Empty AI response");
     }
 
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthIdx = monthNames.indexOf(req.month);
+    const monthStr = String(monthIdx + 1).padStart(2, '0');
+
     return rawData.map((item: any) => ({
       ...item,
-      key: `${req.year}-${String(new Date(`${req.month} 1, ${req.year}`).getMonth() + 1).padStart(2, '0')}-${String(item.d).padStart(2, '0')}`,
+      key: `${req.year}-${monthStr}-${String(item.d).padStart(2, '0')}`,
       plt: req.platform,
       niche: req.niche
     }));

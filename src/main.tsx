@@ -687,8 +687,24 @@ function renderCal() {
   
   let html = '';
   // Padding from previous month
+  const pm = m === 0 ? 11 : m - 1;
+  const py = m === 0 ? y - 1 : y;
   for (let i = firstDOW - 1; i >= 0; i--) {
-    html += `<div class="cal-cell other"><div class="cal-num">${prevMonthLastDay - i}</div></div>`;
+    const d = prevMonthLastDay - i;
+    const key = `${py}-${String(pm + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const post = U.cal[key];
+    const isDone = U.done[key];
+    html += `
+      <div class="cal-cell other ${post ? 'has-post' : ''} ${isDone ? 'done' : ''}" data-key="${key}">
+        <div class="cal-num">${d}</div>
+        ${post ? `
+          <div class="cal-content-area">
+            <div class="cal-hook-txt">${post.hook}</div>
+          </div>
+          <div class="ct-tag" data-ct="${post.ct}">${post.ct}</div>
+        ` : ''}
+      </div>
+    `;
   }
   
   const todayStr = new Date().toISOString().split('T')[0];
@@ -719,10 +735,25 @@ function renderCal() {
   }
   
   // Padding for next month to fill the grid (6 rows * 7 days = 42 cells)
+  const nm = m === 11 ? 0 : m + 1;
+  const ny = m === 11 ? y + 1 : y;
   const totalCells = firstDOW + daysInMonth;
   const remaining = 42 - totalCells;
-  for (let i = 1; i <= remaining; i++) {
-    html += `<div class="cal-cell other"><div class="cal-num">${i}</div></div>`;
+  for (let d = 1; d <= remaining; d++) {
+    const key = `${ny}-${String(nm + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const post = U.cal[key];
+    const isDone = U.done[key];
+    html += `
+      <div class="cal-cell other ${post ? 'has-post' : ''} ${isDone ? 'done' : ''}" data-key="${key}">
+        <div class="cal-num">${d}</div>
+        ${post ? `
+          <div class="cal-content-area">
+            <div class="cal-hook-txt">${post.hook}</div>
+          </div>
+          <div class="ct-tag" data-ct="${post.ct}">${post.ct}</div>
+        ` : ''}
+      </div>
+    `;
   }
   
   grid.innerHTML = html;
@@ -940,7 +971,8 @@ function updateStats() {
   }
 
   const bar = document.getElementById('streakBar')!;
-  bar.style.width = Math.min(100, (U.streak / 7) * 100) + '%';
+  const progress = (U.streak % 7 === 0 && U.streak > 0) ? 7 : (U.streak % 7);
+  bar.style.width = (progress / 7 * 100) + '%';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1339,7 +1371,17 @@ function init() {
     });
     if (tone === false) return;
 
-    await startGeneration(theme as string, tone as string);
+    const btn = document.getElementById('btnRegen') as HTMLButtonElement;
+    const oldTxt = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⌛ Generating...';
+
+    try {
+      await startGeneration(theme as string, tone as string);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = oldTxt;
+    }
   });
   
   document.getElementById('btnSaveSP')?.addEventListener('click', () => {
