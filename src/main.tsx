@@ -107,6 +107,7 @@ async function uLoad() {
 
   try {
     // 1. Try loading from Firestore first
+    console.log('Attempting to load data from Firestore for user:', DB.user.id);
     const docRef = doc(db, "profiles", DB.user.id);
     const loadPromise = getDoc(docRef);
 
@@ -115,11 +116,10 @@ async function uLoad() {
     let d: any = null;
 
     if (docSnap.exists()) {
-      console.log('Loaded data from Firestore');
+      console.log('✅ Successfully loaded data from Firestore');
       d = docSnap.data().data;
     } else {
-      // 2. Fallback to local storage for migration or offline
-      console.log('Firestore load failed or empty, trying local storage');
+      console.log('ℹ️ No document found in Firestore, checking local storage fallback');
       const raw = localStorage.getItem('st_u_' + DB.user.id);
       if (raw) d = JSON.parse(raw);
     }
@@ -810,7 +810,7 @@ function toggleDone() {
 }
 
 async function sendMilestoneEmail(streak: number) {
-  if (!DB.user || DB.user.id === 'demo-user') return;
+  if (!DB.user) return;
   const user = DB.user;
 
   try {
@@ -880,15 +880,9 @@ function updateStats() {
 
   const conn = document.getElementById('connStatus');
   if (conn) {
-    if (DB.user?.id === 'demo-user') {
-      conn.textContent = 'OFFLINE MODE';
-      conn.style.background = 'rgba(255,107,107,0.1)';
-      conn.style.color = '#FF6B6B';
-    } else {
-      conn.textContent = 'SYNCED';
-      conn.style.background = 'rgba(46,213,115,0.1)';
-      conn.style.color = '#2ED573';
-    }
+    conn.textContent = 'SYNCED';
+    conn.style.background = 'rgba(46,213,115,0.1)';
+    conn.style.color = '#2ED573';
   }
 
   document.getElementById('streakVal')!.textContent = String(U.streak);
@@ -975,11 +969,6 @@ function renderAnalytics() {
     <div class="an-header">
       <h1 class="an-title">Growth Analytics</h1>
       <p class="an-sub">Tracking your progress in the ${U.ob.niche} niche on ${U.ob.plt}.</p>
-      ${DB.user?.id === 'demo-user' ? `
-        <div style="background:rgba(255,107,107,0.1); color:#FF6B6B; padding:10px 16px; border-radius:10px; font-size:12px; margin-top:16px; border:1px solid rgba(255,107,107,0.1); display:inline-block;">
-          ⚠️ <strong>Offline Mode:</strong> Data is only saved to this browser.
-        </div>
-      ` : ''}
     </div>
     
     <div class="an-grid">
@@ -1207,8 +1196,9 @@ function init() {
 
   // Firebase Auth Listener
   if (isConfigured) {
+    console.log("Firebase is configured. Listening for auth changes...");
     onAuthStateChanged(auth, async (user) => {
-      console.log('Auth state changed:', user);
+      console.log('Auth state changed:', user ? `User logged in: ${user.email}` : 'No user logged in');
       try {
         if (user) {
           await doLogin(user);
