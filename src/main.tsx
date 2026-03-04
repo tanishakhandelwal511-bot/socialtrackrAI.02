@@ -1139,13 +1139,19 @@ function init() {
   const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
   const authErr = document.getElementById('authErr')!;
   
-  const isConfigured = firebaseApiKey && !firebaseApiKey.includes('placeholder');
+  const hasQuotes = firebaseApiKey && (firebaseApiKey.startsWith('"') || firebaseApiKey.endsWith('"') || firebaseApiKey.startsWith("'") || firebaseApiKey.endsWith("'"));
+  const isConfigured = firebaseApiKey && !firebaseApiKey.includes('placeholder') && !hasQuotes;
 
   if (!isConfigured) {
+    let errorMsg = `To enable <strong>Google Login</strong> and save your data, you need a Firebase project.`;
+    if (hasQuotes) {
+      errorMsg = `<span style="color:var(--err); font-weight:bold;">⚠️ Error: Your API Key contains quotes!</span><br>Please remove the quotes (") from the <code>VITE_FIREBASE_API_KEY</code> in the Secrets panel. It should start with <code>AIza...</code> directly.`;
+    }
+    
     authErr.innerHTML = `
       <div style="background:rgba(108,92,231,0.1); color:var(--p); padding:20px; border-radius:16px; font-size:14px; margin-bottom:24px; border:1px solid rgba(108,92,231,0.2); line-height:1.6;">
         <h3 style="margin:0 0 12px 0; font-family:'Syne', sans-serif;">🚀 Final Step: Connect your Firebase</h3>
-        <p style="margin-bottom:16px; opacity:0.8;">To enable <strong>Google Login</strong> and save your data, you need a Firebase project.</p>
+        <p style="margin-bottom:16px; opacity:0.8;">${errorMsg}</p>
         
         <ol style="padding-left:20px; margin-bottom:20px;">
           <li>Go to <a href="https://console.firebase.google.com/" target="_blank" style="color:var(--p); font-weight:600;">Firebase Console</a> and create a project.</li>
