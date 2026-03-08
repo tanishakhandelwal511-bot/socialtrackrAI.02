@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentResponse, ThinkingLevel } from "@google/genai";
 
 // Initialize the AI
 const getAI = () => {
@@ -35,7 +35,7 @@ export interface MonthlyPlanRequest {
 export class GeminiService {
   /**
    * Generates a full month of content strategy.
-   * Uses Gemini 3.1 Pro for high-level reasoning.
+   * Uses Gemini 3 Flash for speed.
    */
   static async generateMonthlyPlan(req: MonthlyPlanRequest): Promise<Post[]> {
     try {
@@ -68,10 +68,11 @@ export class GeminiService {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseSchema: {
           type: Type.ARRAY,
           items: {
@@ -137,8 +138,48 @@ export class GeminiService {
 
   /**
    * AI Assistant for chat and post refinement.
-   * Uses Gemini 3 Flash for low latency.
+   * Uses Gemini 3 Flash for low latency and supports streaming.
    */
+  static async *chatStream(message: string, context: any) {
+    try {
+      const ai = getAI();
+      const systemInstruction = `
+      You are the SocialTrackr AI Growth Assistant. 
+      You help users grow on ${context.plt} in the ${context.niche} niche.
+      
+      CURRENT CONTEXT:
+      - Platform: ${context.plt}
+      - Niche: ${context.niche}
+      - Content Types: ${context.cts?.join(", ")}
+      - Recent Performance: ${JSON.stringify((context.metrics || []).slice(-10))}
+      
+      TONE: Professional, encouraging, data-driven, and highly actionable.
+      
+      CAPABILITIES:
+      - Improve hooks (make them more "viral" or "curiosity-driven")
+      - Rewrite captions for better engagement
+      - Analyze metrics to suggest strategy shifts
+      - Break down carousels into slide-by-slide instructions
+    `;
+
+      const chat = ai.chats.create({
+        model: "gemini-3-flash-preview",
+        config: {
+          systemInstruction,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+        }
+      });
+
+      const result = await chat.sendMessageStream({ message });
+      for await (const chunk of result) {
+        yield chunk.text || "";
+      }
+    } catch (e: any) {
+      console.error("Gemini Chat Stream error:", e);
+      yield "I'm sorry, I encountered an error: " + e.message;
+    }
+  }
+
   static async chat(message: string, context: any): Promise<string> {
     try {
       const ai = getAI();
@@ -165,7 +206,8 @@ export class GeminiService {
       model: "gemini-3-flash-preview",
       contents: message,
       config: {
-        systemInstruction
+        systemInstruction,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
       }
     });
 

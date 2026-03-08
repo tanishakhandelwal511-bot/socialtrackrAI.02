@@ -1,6 +1,6 @@
 import { GeminiService, Post } from './services/gemini.ts';
 import { auth, db, googleProvider } from './services/firebase.ts';
-import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithPopup, signOut as firebaseSignOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithPopup, signOut as firebaseSignOut, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import './index.css';
 
@@ -350,6 +350,11 @@ async function handleAuth() {
     return;
   }
 
+  if (!auth) {
+    showToast('⚠️ Firebase is not configured.');
+    return;
+  }
+
   const email = (document.getElementById('emailIn') as HTMLInputElement).value.trim().toLowerCase();
   const pass = (document.getElementById('passIn') as HTMLInputElement).value;
   const authErr = document.getElementById('authErr')!;
@@ -370,6 +375,8 @@ async function handleAuth() {
       if (!name) {
         authErr.textContent = 'Please enter your name.';
         authErr.classList.add('show');
+        authBtn.disabled = false;
+        authBtn.textContent = 'Create Account';
         return;
       }
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -380,7 +387,28 @@ async function handleAuth() {
     }
   } catch (e: any) {
     console.error('Auth error:', e);
-    authErr.textContent = e.message || 'Authentication failed.';
+    let msg = e.message || 'Authentication failed.';
+    
+    if (e.code === 'auth/email-already-in-use') {
+      msg = `<div style="color:var(--p); font-weight:600; margin-bottom:8px;">📧 This email is already registered!</div>
+             <div style="font-size:12px; opacity:0.8;">Switching you to <strong>Sign in</strong> mode...</div>`;
+      // Automatically switch to login mode for convenience
+      if (authMode === 'signup') {
+        setTimeout(() => toggleAuthMode(), 1500);
+      }
+    } else if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') {
+      msg = 'Invalid email or password. Please try again.';
+    } else if (e.code === 'auth/popup-blocked') {
+      msg = 'Sign-in popup was blocked. Please allow popups for this site.';
+    } else if (e.code === 'auth/popup-closed-by-user') {
+      msg = 'Sign-in window was closed before completion.';
+    } else if (e.code === 'auth/operation-not-allowed') {
+      msg = 'This sign-in method is not enabled in Firebase Console.';
+    } else if (e.code === 'auth/network-request-failed') {
+      msg = 'Network error. Please check your connection and Firebase configuration.';
+    }
+    
+    authErr.innerHTML = msg;
     authErr.classList.add('show');
   } finally {
     authBtn.disabled = false;
@@ -395,13 +423,110 @@ async function handleGoogleAuth() {
     return;
   }
 
+  if (!auth) {
+    showToast('⚠️ Firebase is not configured.');
+    return;
+  }
+
   try {
     await signInWithPopup(auth, googleProvider);
   } catch (e: any) {
+    console.error('Google Auth error:', e);
     const authErr = document.getElementById('authErr')!;
-    authErr.textContent = e.message || 'Google Auth failed.';
+    let msg = e.message || 'Google Auth failed.';
+    
+    if (e.code === 'auth/popup-blocked') {
+      msg = 'Popup blocked! Please allow popups for this site to sign in with Google.';
+    } else if (e.code === 'auth/popup-closed-by-user') {
+      msg = 'Sign-in window closed. Please try again.';
+    } else if (e.code === 'auth/operation-not-allowed') {
+      msg = 'Google Sign-in is not enabled in your Firebase Console. Go to Authentication -> Sign-in method -> Enable Google.';
+    } else if (e.code === 'auth/unauthorized-domain') {
+      msg = `This domain (<strong>${window.location.hostname}</strong>) is not authorized in Firebase Console. Add it to Authentication -> Settings -> Authorized domains.`;
+    } else if (e.code === 'auth/network-request-failed') {
+      msg = 'Network error. If you are in AI Studio preview, try opening the app in a new tab using the "Open in new tab" button in the top right.';
+    } else if (e.code === 'auth/internal-error') {
+      msg = 'Internal Firebase error. Check your API key and project ID in Secrets.';
+    }
+    
+    authErr.innerHTML = msg;
     authErr.classList.add('show');
+    
+    // Add a troubleshooting tip
+    const tip = document.createElement('div');
+    tip.style.marginTop = '16px';
+    tip.style.padding = '12px';
+    tip.style.background = 'rgba(255,255,255,0.05)';
+    tip.style.borderRadius = '8px';
+    tip.style.fontSize = '12px';
+    tip.innerHTML = `
+      <p style="margin:0 0 8px 0; font-weight:600;">💡 Troubleshooting Tips:</p>
+      <ul style="margin:0; padding-left:16px; opacity:0.8;">
+        <li>Ensure <strong>Google</strong> is enabled in Authentication -> Sign-in method.</li>
+        <li>Add <strong>${window.location.hostname}</strong> to Authorized Domains.</li>
+        <li>Check if your API Key has any restrictions in Google Cloud Console.</li>
+        <li>Try clicking the "Open in new tab" icon in the top right.</li>
+      </ul>
+    `;
+    authErr.appendChild(tip);
   }
+}
+
+async function handleForgotPass() {
+  const email = (document.getElementById('emailIn') as HTMLInputElement).value.trim();
+  if (!email) {
+    showToast('⚠️ Please enter your email first.');
+    return;
+  }
+  
+  if (!auth) {
+    showToast('⚠️ Firebase is not configured.');
+    return;
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, email);
+    showToast('📧 Password reset email sent!');
+  } catch (e: any) {
+    console.error('Reset error:', e);
+    showToast('⚠️ ' + (e.message || 'Failed to send reset email.'));
+  }
+}
+
+async function handleDebugAuth() {
+  const authErr = document.getElementById('authErr')!;
+  authErr.innerHTML = '<div style="color:var(--p); font-size:12px;">🔍 Checking Firebase connection...</div>';
+  authErr.classList.add('show');
+  
+  const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+  const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+  
+  let report = `<div style="text-align:left; font-size:12px; line-height:1.6; padding:10px; background:rgba(255,255,255,0.05); border-radius:8px; margin-top:10px;">
+    <strong>Debug Report:</strong><br>
+    • API Key: ${firebaseApiKey ? (firebaseApiKey.slice(0, 8) + '...') : '❌ Missing'}<br>
+    • Project ID: ${projectId || '❌ Missing'}<br>
+    • Domain: ${window.location.hostname}<br>
+    • Auth Service: ${auth ? '✅ Ready' : '❌ Not Initialized'}<br>
+    • Firestore: ${db ? '✅ Ready' : '❌ Not Initialized'}<br>
+  `;
+
+  try {
+    // Try a simple fetch to see if the API key is valid
+    const url = `https://identitytoolkit.googleapis.com/v1/projects?key=${firebaseApiKey}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      report += `• API Key Status: ✅ Valid<br>`;
+    } else {
+      const data = await res.json();
+      report += `• API Key Status: ❌ Error (${data.error?.message || res.status})<br>`;
+    }
+  } catch (e: any) {
+    report += `• API Key Status: ❌ Network Error (${e.message})<br>`;
+  }
+  
+  report += `</div>`;
+  authErr.innerHTML = report;
 }
 
 async function doLogin(user: any) {
@@ -878,26 +1003,23 @@ async function sendMilestoneEmail(streak: number) {
     
     console.log(`Milestone API response: ${res.status} ${res.statusText}`);
     
-    let data;
     const contentType = res.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
-      data = await res.json();
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`📧 Milestone email sent!`);
+      } else {
+        console.error("Email failed:", data.error);
+        showToast(`⚠️ Email failed: ${data.error || 'Unknown error'}`);
+      }
     } else {
       const text = await res.text();
-      console.error(`Non-JSON response from ${res.url}:`, text.slice(0, 200));
+      console.error(`Non-JSON response from ${res.url}:`, text.slice(0, 500));
       if (res.status === 404) {
-        showToast(`⚠️ API Route not found (404). Check server logs.`);
+        showToast(`⚠️ API Route not found (404).`);
       } else {
-        showToast(`⚠️ Server error (${res.status}). Check console.`);
+        showToast(`⚠️ Server error (${res.status}).`);
       }
-      return;
-    }
-
-    if (res.ok) {
-      showToast(`📧 Milestone email sent!`);
-    } else {
-      console.error("Email failed:", data.error);
-      showToast(`⚠️ Email failed: ${data.error || 'Unknown error'}`);
     }
   } catch (e: any) {
     console.error("Failed to send milestone email", e);
@@ -994,14 +1116,27 @@ async function sendAI() {
   msgs.scrollTop = msgs.scrollHeight;
 
   try {
-    const reply = await GeminiService.chat(msg, {
+    const stream = GeminiService.chatStream(msg, {
       plt: U.ob.plt,
       niche: U.ob.niche,
       cts: U.ob.cts,
       metrics: U.metrics
     });
+    
     typing.remove();
-    msgs.innerHTML += `<div class="ai-msg"><div class="ai-bub bot">${reply}</div></div>`;
+    const botMsg = document.createElement('div');
+    botMsg.className = 'ai-msg';
+    const botBub = document.createElement('div');
+    botBub.className = 'ai-bub bot';
+    botMsg.appendChild(botBub);
+    msgs.appendChild(botMsg);
+    
+    let fullText = '';
+    for await (const chunk of stream) {
+      fullText += chunk;
+      botBub.textContent = fullText;
+      msgs.scrollTop = msgs.scrollHeight;
+    }
   } catch (e: any) {
     typing.textContent = e.message || "Error connecting to AI.";
   }
@@ -1219,6 +1354,7 @@ function init() {
             <code>VITE_FIREBASE_APP_ID</code>
           </li>
           <li><strong>Enable Auth:</strong> Go to Authentication -> Sign-in method -> Enable Email/Password and Google.</li>
+          <li><strong>Authorized Domains:</strong> Add <code>${window.location.hostname}</code> to Authentication -> Settings -> Authorized domains.</li>
           <li><strong>Enable Firestore:</strong> Go to Firestore Database -> Create database.</li>
         </ol>
       </div>
@@ -1294,6 +1430,8 @@ function init() {
   document.getElementById('authBtn')?.addEventListener('click', handleAuth);
   document.getElementById('googleAuthBtn')?.addEventListener('click', handleGoogleAuth);
   document.getElementById('toggleAuthMode')?.addEventListener('click', toggleAuthMode);
+  document.getElementById('btnForgotPass')?.addEventListener('click', handleForgotPass);
+  document.getElementById('btnDebugAuth')?.addEventListener('click', handleDebugAuth);
   document.getElementById('obNextBtn')?.addEventListener('click', () => {
     if (U.obStep < 4) {
       U.obStep++;
