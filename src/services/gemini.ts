@@ -137,6 +137,66 @@ export class GeminiService {
   }
 
   /**
+   * Generates a single post for a specific date.
+   */
+  static async generateSinglePost(req: { platform: string, niche: string, contentType: string, date: string }): Promise<Post> {
+    try {
+      const ai = getAI();
+      const prompt = `
+        Create a high-impact social media post for ${req.date}.
+        PLATFORM: ${req.platform}
+        NICHE: ${req.niche}
+        CONTENT TYPE: ${req.contentType}
+        
+        Return a JSON object with: ct, hook, cap, cta, tags.
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              ct: { type: Type.STRING },
+              hook: { type: Type.STRING },
+              cap: { type: Type.STRING },
+              cta: { type: Type.STRING },
+              tags: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["ct", "hook", "cap", "cta", "tags"]
+          }
+        }
+      });
+
+      const data = JSON.parse(response.text || "{}");
+      const day = parseInt(req.date.split('-')[2]);
+      
+      return {
+        ...data,
+        key: req.date,
+        d: day,
+        plt: req.platform,
+        niche: req.niche
+      };
+    } catch (e: any) {
+      console.error("Gemini Single Post error:", e);
+      return {
+        key: req.date,
+        d: parseInt(req.date.split('-')[2]),
+        plt: req.platform,
+        niche: req.niche,
+        ct: req.contentType,
+        hook: `Custom post for ${req.date}`,
+        cap: `This post was created manually or during an AI error. You can edit this caption to fit your needs!`,
+        cta: `Check the link in bio!`,
+        tags: [req.niche.replace(/\s+/g, ''), 'growth']
+      };
+    }
+  }
+
+  /**
    * AI Assistant for chat and post refinement.
    * Uses Gemini 3 Flash for low latency and supports streaming.
    */

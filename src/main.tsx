@@ -743,6 +743,30 @@ function buildCTGrid() {
   }));
 }
 
+async function promptCreatePost(key: string) {
+  const confirm = window.confirm(`No post scheduled for ${key}. Would you like to generate one for this day?`);
+  if (!confirm) return;
+  
+  showToast('Generating post for ' + key + '...');
+  try {
+    const post = await GeminiService.generateSinglePost({
+      platform: U.ob.plt!,
+      niche: U.ob.niche!,
+      contentType: U.ob.cts[0] || 'Educational',
+      date: key
+    });
+    
+    U.cal[key] = post;
+    uSave();
+    renderCal();
+    openSP(key);
+    showToast('Post created! ✨');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to generate post.');
+  }
+}
+
 async function startGeneration(theme?: string, tone?: string) {
   console.log("Starting generation for:", { theme, tone, month: MONTHS[U.calM], year: U.calY });
   showPage('gen');
@@ -817,6 +841,14 @@ function renderCal() {
   const grid = document.getElementById('calGrid')!;
   const firstDOW = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m + 1, 0).getDate();
+  
+  // Update button text based on whether month has posts
+  const monthPrefix = `${y}-${String(m + 1).padStart(2, '0')}`;
+  const hasPosts = Object.keys(U.cal).some(k => k.startsWith(monthPrefix));
+  const regenBtn = document.getElementById('btnRegen');
+  if (regenBtn) {
+    regenBtn.textContent = hasPosts ? '↻ Regenerate Month' : '✨ Generate Month';
+  }
   
   // Get days in previous month for padding
   const prevMonthLastDay = new Date(y, m, 0).getDate();
@@ -893,8 +925,15 @@ function renderCal() {
   }
   
   grid.innerHTML = html;
-  grid.querySelectorAll('.has-post').forEach(el => el.addEventListener('click', (e) => {
-    openSP((e.currentTarget as HTMLElement).dataset.key!);
+  grid.querySelectorAll('.cal-cell').forEach(el => el.addEventListener('click', (e) => {
+    const key = (e.currentTarget as HTMLElement).dataset.key!;
+    const post = U.cal[key];
+    if (post) {
+      openSP(key);
+    } else {
+      // Check if it's not a future date too far out (optional, but let's allow it)
+      promptCreatePost(key);
+    }
   }));
 
   // Render Upcoming
@@ -915,7 +954,10 @@ function renderCal() {
 
 function openSP(key: string) {
   const post = U.cal[key];
-  if (!post) return;
+  if (!post) {
+    promptCreatePost(key);
+    return;
+  }
   U.openKey = key;
   
   const todayStr = new Date().toISOString().split('T')[0];
@@ -1058,9 +1100,21 @@ function calcStreak() {
 }
 
 function updateStats() {
+  const now = new Date();
+  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthPrefix = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
+
   const planned = Object.keys(U.cal).length;
   const done = Object.keys(U.done).filter(k => U.done[k]).length;
   const pct = planned ? Math.round((done / planned) * 100) : 0;
+  
+  // Last Month Stats
+  const lastMonthPlanned = Object.keys(U.cal).filter(k => k.startsWith(lastMonthPrefix)).length;
+  const lastMonthDone = Object.keys(U.done).filter(k => k.startsWith(lastMonthPrefix) && U.done[k]).length;
+  const lastMonthPct = lastMonthPlanned ? Math.round((lastMonthDone / lastMonthPlanned) * 100) : 0;
+
   const totalViews = U.metrics.reduce((acc, m) => acc + m.views, 0);
 
   const conn = document.getElementById('connStatus');
@@ -1070,6 +1124,10 @@ function updateStats() {
     conn.style.color = '#2ED573';
   }
 
+  document.getElementById('dsLastMonth')!.textContent = lastMonthPct + '%';
+  document.getElementById('dsViews')!.textContent = totalViews.toLocaleString();
+  document.getElementById('dsStreak')!.textContent = U.streak + 'd';
+  
   document.getElementById('streakVal')!.textContent = String(U.streak);
   document.getElementById('qPlanned')!.textContent = String(planned);
   document.getElementById('qDone')!.textContent = String(done);
