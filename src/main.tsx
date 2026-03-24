@@ -849,6 +849,17 @@ function renderCal() {
   if (regenBtn) {
     regenBtn.textContent = hasPosts ? '↻ Regenerate Month' : '✨ Generate Month';
   }
+
+  // Show month stats in header
+  const monthPlanned = Object.keys(U.cal).filter(k => k.startsWith(monthPrefix)).length;
+  const monthDone = Object.keys(U.done).filter(k => k.startsWith(monthPrefix) && U.done[k]).length;
+  const monthPct = monthPlanned ? Math.round((monthDone / monthPlanned) * 100) : 0;
+  const statsEl = document.getElementById('monthStats');
+  if (statsEl) {
+    const isCurrentMonth = y === new Date().getFullYear() && m === new Date().getMonth();
+    const label = isCurrentMonth ? "This Month's Progress" : `${MONTHS[m]} Progress`;
+    statsEl.textContent = monthPlanned > 0 ? `${label}: ${monthPct}% (${monthDone}/${monthPlanned} done)` : '';
+  }
   
   // Get days in previous month for padding
   const prevMonthLastDay = new Date(y, m, 0).getDate();
@@ -1100,21 +1111,10 @@ function calcStreak() {
 }
 
 function updateStats() {
-  const now = new Date();
-  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  
-  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthPrefix = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
-
   const planned = Object.keys(U.cal).length;
   const done = Object.keys(U.done).filter(k => U.done[k]).length;
   const pct = planned ? Math.round((done / planned) * 100) : 0;
   
-  // Last Month Stats
-  const lastMonthPlanned = Object.keys(U.cal).filter(k => k.startsWith(lastMonthPrefix)).length;
-  const lastMonthDone = Object.keys(U.done).filter(k => k.startsWith(lastMonthPrefix) && U.done[k]).length;
-  const lastMonthPct = lastMonthPlanned ? Math.round((lastMonthDone / lastMonthPlanned) * 100) : 0;
-
   const totalViews = U.metrics.reduce((acc, m) => acc + m.views, 0);
 
   const conn = document.getElementById('connStatus');
@@ -1124,7 +1124,6 @@ function updateStats() {
     conn.style.color = '#2ED573';
   }
 
-  document.getElementById('dsLastMonth')!.textContent = lastMonthPct + '%';
   document.getElementById('dsViews')!.textContent = totalViews.toLocaleString();
   document.getElementById('dsStreak')!.textContent = U.streak + 'd';
   
