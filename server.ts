@@ -1,7 +1,9 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import { Resend } from "resend";
-import * as admin from "firebase-admin";
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { credential } from "firebase-admin";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -15,22 +17,26 @@ dotenv.config();
 // Initialize Firebase Admin
 if (process.env.VITE_FIREBASE_PROJECT_ID) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-    });
-    console.log("Firebase Admin initialized.");
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: credential.applicationDefault(),
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+      });
+      console.log("Firebase Admin initialized.");
+    }
   } catch (e) {
     console.warn("Firebase Admin initialization failed. applicationDefault() might not be available. Falling back to project ID only.");
-    admin.initializeApp({
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-    });
+    if (getApps().length === 0) {
+      initializeApp({
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+      });
+    }
   }
 } else {
   console.warn("VITE_FIREBASE_PROJECT_ID missing. Firebase Admin not initialized.");
 }
 
-const db = admin.apps.length ? admin.firestore() : null;
+const db = getApps().length ? getFirestore() : null;
 
 // Initialize Resend lazily
 let resendClient: Resend | null = null;
