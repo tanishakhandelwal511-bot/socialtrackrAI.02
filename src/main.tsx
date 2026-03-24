@@ -1,5 +1,5 @@
-import { GeminiService, Post } from './services/gemini.ts';
-import { auth, db, googleProvider } from './services/firebase.ts';
+import { GeminiService, Post } from './services/gemini';
+import { auth, db, googleProvider } from './services/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signInWithPopup, signOut as firebaseSignOut, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import './index.css';
@@ -43,6 +43,21 @@ interface AppState {
   webhook_url?: string;
 }
 
+// ═══════════════════════════════════════════════════════
+// SAFE LOCAL STORAGE
+// ═══════════════════════════════════════════════════════
+const ls = {
+  get: (key: string) => {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  },
+  set: (key: string, val: string) => {
+    try { localStorage.setItem(key, val); } catch (e) { }
+  },
+  remove: (key: string) => {
+    try { localStorage.removeItem(key); } catch (e) { }
+  }
+};
+
 const U: AppState = {
   ob: { plt: null, niche: null, cts: [], freq: null },
   obStep: 1,
@@ -56,7 +71,7 @@ const U: AppState = {
   best: 0,
   openKey: null,
   aiInited: false,
-  dark: localStorage.getItem('st_dark') === 'true',
+  dark: ls.get('st_dark') === 'true',
   webhook_url: '',
 };
 
@@ -64,16 +79,12 @@ const U: AppState = {
 // PERSISTENCE
 // ═══════════════════════════════════════════════════════
 function dbLoad() {
-  try {
-    DB.session = localStorage.getItem('st_session') || null;
-  } catch (e) {
-    DB.session = null;
-  }
+  DB.session = ls.get('st_session') || null;
 }
 
 function dbSave() {
-  if (DB.session) localStorage.setItem('st_session', DB.session);
-  else localStorage.removeItem('st_session');
+  if (DB.session) ls.set('st_session', DB.session);
+  else ls.remove('st_session');
 }
 
 async function uLoad() {
@@ -84,7 +95,7 @@ async function uLoad() {
   const isConfigured = firebaseApiKey && !firebaseApiKey.includes('placeholder');
   
   if (!isConfigured) {
-    const raw = localStorage.getItem('st_u_' + DB.user.id);
+    const raw = ls.get('st_u_' + DB.user.id);
     if (raw) {
       const d = JSON.parse(raw);
       U.ob = d.ob || { plt: null, niche: null, cts: [], freq: null };
@@ -94,7 +105,7 @@ async function uLoad() {
       U.metrics = d.metrics || [];
       U.obStep = d.obStep || 1;
       U.webhook_url = d.webhook_url || '';
-      U.dark = d.dark !== undefined ? d.dark : (localStorage.getItem('st_dark') === 'true');
+      U.dark = d.dark !== undefined ? d.dark : (ls.get('st_dark') === 'true');
       applyDark();
     }
     return;
@@ -124,7 +135,7 @@ async function uLoad() {
     
     if (!d) {
       console.log('ℹ️ No document found in Firestore (or db not ready), checking local storage fallback');
-      const raw = localStorage.getItem('st_u_' + DB.user.id);
+      const raw = ls.get('st_u_' + DB.user.id);
       if (raw) d = JSON.parse(raw);
     }
 
@@ -137,7 +148,7 @@ async function uLoad() {
     U.metrics = d.metrics || [];
     U.obStep = d.obStep || 1;
     U.webhook_url = d.webhook_url || '';
-    U.dark = d.dark !== undefined ? d.dark : (localStorage.getItem('st_dark') === 'true');
+    U.dark = d.dark !== undefined ? d.dark : (ls.get('st_dark') === 'true');
     const now = new Date();
     U.calY = now.getFullYear();
     U.calM = now.getMonth();
@@ -157,8 +168,8 @@ async function uSave() {
   };
 
   // 1. Save locally for immediate persistence
-  localStorage.setItem('st_u_' + DB.user.id, JSON.stringify(data));
-  localStorage.setItem('st_dark', String(U.dark));
+  ls.set('st_u_' + DB.user.id, JSON.stringify(data));
+  ls.set('st_dark', String(U.dark));
 
   // Skip Firebase if not configured
   const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;

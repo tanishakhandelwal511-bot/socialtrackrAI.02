@@ -260,7 +260,9 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`🚀 SocialTrackr Server is now listening on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Firebase Project: ${process.env.VITE_FIREBASE_PROJECT_ID || 'Not set'}`);
   });
 
   // Global error handler
