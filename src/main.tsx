@@ -1520,6 +1520,29 @@ function init() {
   document.getElementById('navDash')?.addEventListener('click', () => goto('dash'));
   document.getElementById('navAn')?.addEventListener('click', () => goto('an'));
   document.getElementById('navAi')?.addEventListener('click', () => goto('ai'));
+  document.getElementById('navTestEmail')?.addEventListener('click', async () => {
+    if (!DB.user) return showToast('Please sign in first.');
+    showToast('Sending test email...');
+    try {
+      const res = await fetch('/api/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: DB.user.email,
+          name: DB.user.name
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Test email sent! Check your inbox (and spam).');
+      } else {
+        showToast('Error: ' + data.error);
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to send test email. Check console.');
+    }
+  });
   document.getElementById('navDash2')?.addEventListener('click', () => goto('dash'));
   document.getElementById('navAn2')?.addEventListener('click', () => goto('an'));
   document.getElementById('navAi2')?.addEventListener('click', () => goto('ai'));
