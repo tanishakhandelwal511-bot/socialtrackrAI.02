@@ -504,41 +504,6 @@ async function handleForgotPass() {
   }
 }
 
-async function handleDebugAuth() {
-  const authErr = document.getElementById('authErr')!;
-  authErr.innerHTML = '<div style="color:var(--p); font-size:12px;">🔍 Checking Firebase connection...</div>';
-  authErr.classList.add('show');
-  
-  const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
-  const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
-  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-  
-  let report = `<div style="text-align:left; font-size:12px; line-height:1.6; padding:10px; background:rgba(255,255,255,0.05); border-radius:8px; margin-top:10px;">
-    <strong>Debug Report:</strong><br>
-    • API Key: ${firebaseApiKey ? (firebaseApiKey.slice(0, 8) + '...') : '❌ Missing'}<br>
-    • Project ID: ${projectId || '❌ Missing'}<br>
-    • Domain: ${window.location.hostname}<br>
-    • Auth Service: ${auth ? '✅ Ready' : '❌ Not Initialized'}<br>
-    • Firestore: ${db ? '✅ Ready' : '❌ Not Initialized'}<br>
-  `;
-
-  try {
-    // Try a simple fetch to see if the API key is valid
-    const url = `https://identitytoolkit.googleapis.com/v1/projects?key=${firebaseApiKey}`;
-    const res = await fetch(url);
-    if (res.ok) {
-      report += `• API Key Status: ✅ Valid<br>`;
-    } else {
-      const data = await res.json();
-      report += `• API Key Status: ❌ Error (${data.error?.message || res.status})<br>`;
-    }
-  } catch (e: any) {
-    report += `• API Key Status: ❌ Network Error (${e.message})<br>`;
-  }
-  
-  report += `</div>`;
-  authErr.innerHTML = report;
-}
 
 async function doLogin(user: any) {
   DB.session = user.uid || user.id;
@@ -1068,13 +1033,18 @@ async function sendMilestoneEmail(streak: number) {
     console.log(`Milestone API response: ${res.status} ${res.statusText}`);
     
     const contentType = res.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      const data = await res.json();
-      if (res.ok) {
-        showToast(`📧 Milestone email sent!`);
-      } else {
-        console.error("Email failed:", data.error);
-        showToast(`⚠️ Email failed: ${data.error || 'Unknown error'}`);
+    if (res.status !== 204 && contentType && contentType.includes("application/json")) {
+      try {
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`📧 Milestone email sent!`);
+        } else {
+          console.error("Email failed:", data.error);
+          showToast(`⚠️ Email failed: ${data.error || 'Unknown error'}`);
+        }
+      } catch (jsonErr) {
+        console.error("Failed to parse JSON response:", jsonErr);
+        showToast(`⚠️ Server returned invalid response.`);
       }
     } else {
       const text = await res.text();
@@ -1499,7 +1469,6 @@ function init() {
   document.getElementById('googleAuthBtn')?.addEventListener('click', handleGoogleAuth);
   document.getElementById('toggleAuthMode')?.addEventListener('click', toggleAuthMode);
   document.getElementById('btnForgotPass')?.addEventListener('click', handleForgotPass);
-  document.getElementById('btnDebugAuth')?.addEventListener('click', handleDebugAuth);
   document.getElementById('obNextBtn')?.addEventListener('click', () => {
     if (U.obStep < 4) {
       U.obStep++;
@@ -1520,29 +1489,6 @@ function init() {
   document.getElementById('navDash')?.addEventListener('click', () => goto('dash'));
   document.getElementById('navAn')?.addEventListener('click', () => goto('an'));
   document.getElementById('navAi')?.addEventListener('click', () => goto('ai'));
-  document.getElementById('navTestEmail')?.addEventListener('click', async () => {
-    if (!DB.user) return showToast('Please sign in first.');
-    showToast('Sending test email...');
-    try {
-      const res = await fetch('/api/test-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: DB.user.email,
-          name: DB.user.name
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast('Test email sent! Check your inbox (and spam).');
-      } else {
-        showToast('Error: ' + data.error);
-      }
-    } catch (e) {
-      console.error(e);
-      showToast('Failed to send test email. Check console.');
-    }
-  });
   document.getElementById('navDash2')?.addEventListener('click', () => goto('dash'));
   document.getElementById('navAn2')?.addEventListener('click', () => goto('an'));
   document.getElementById('navAi2')?.addEventListener('click', () => goto('ai'));

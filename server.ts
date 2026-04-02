@@ -239,47 +239,6 @@ async function startServer() {
     })();
   });
   
-  // Test Email Route
-  app.post("/api/test-email", async (req, res) => {
-    const { email, name } = req.body;
-    const client = getResend();
-    
-    if (!client) {
-      return res.status(500).json({ 
-        success: false, 
-        error: "Email service not configured. Please set a valid RESEND_API_KEY." 
-      });
-    }
-    
-    try {
-      await client.emails.send({
-        from: "SocialTrackr <onboarding@resend.dev>",
-        to: [email],
-        subject: "🚀 SocialTrackr: Test Email Successful!",
-        html: `
-          <div style="font-family: sans-serif; padding: 20px; color: #0F172A; max-width: 600px; margin: auto; border: 1px solid #E2E8F0; border-radius: 16px; background-color: #ffffff;">
-            <div style="text-align: center; margin-bottom: 20px;">
-              <span style="font-size: 40px;">✅</span>
-            </div>
-            <h1 style="color: #6C5CE7; margin-top: 0; text-align: center;">It Works!</h1>
-            <p style="font-size: 16px; line-height: 1.6; text-align: center; color: #334155;">
-              Hi <strong>${name}</strong>, your 3-day milestone emails are configured correctly.
-            </p>
-            <p style="font-size: 14px; line-height: 1.5; color: #64748B; text-align: center;">
-              You will receive motivational emails every 3 days of your streak to keep you building and growing.
-            </p>
-            <div style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.APP_URL || '#'}" style="background: #6C5CE7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Back to Dashboard</a>
-            </div>
-          </div>
-        `
-      });
-      res.json({ success: true });
-    } catch (e) {
-      console.error("Test email failed:", e);
-      res.status(500).json({ success: false, error: String(e) });
-    }
-  });
 
   // Handle unknown API routes with JSON
   app.all("/api/*", (req, res) => {
